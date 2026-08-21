@@ -1,4 +1,3 @@
-
 "use client";
 
 import {
@@ -15,7 +14,13 @@ import {
   Users,
   X,
 } from "lucide-react";
-import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from "react";
+import {
+  ChangeEvent,
+  FormEvent,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 
 type FileRecord = {
   id: string;
@@ -24,7 +29,13 @@ type FileRecord = {
   storageKey: string;
   mimeType: string;
   size: number;
-  type: "PHOTO" | "VIDEO" | "DOCUMENT" | "CONTRACT" | "INVOICE" | "OTHER";
+  type:
+    | "PHOTO"
+    | "VIDEO"
+    | "DOCUMENT"
+    | "CONTRACT"
+    | "INVOICE"
+    | "OTHER";
   visibility: "PUBLIC" | "PRIVATE";
   clientId: string | null;
   bookingId: string | null;
@@ -39,11 +50,12 @@ type FileRecord = {
 
   client: {
     id: string;
+    name: string;
+    email: string;
+    phone: string | null;
     companyName: string | null;
-    user: {
-      name: string | null;
-      email: string;
-    };
+    city: string | null;
+    province: string | null;
   } | null;
 
   booking: {
@@ -55,11 +67,12 @@ type FileRecord = {
 
 type Client = {
   id: string;
+  name: string;
+  email: string;
+  phone: string | null;
   companyName: string | null;
-  user: {
-    name: string | null;
-    email: string;
-  };
+  city: string | null;
+  province: string | null;
 };
 
 const fileTypeFilters = [
@@ -83,14 +96,16 @@ export default function FilesPage() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const [search, setSearch] = useState("");
-  const [typeFilter, setTypeFilter] = useState<FileTypeFilter>("ALL");
+  const [typeFilter, setTypeFilter] =
+    useState<FileTypeFilter>("ALL");
 
   const [modalOpen, setModalOpen] = useState(false);
 
-  const [selectedFile, setSelectedFile] = useState<globalThis.File | null>(
-    null,
-  );
-  const [selectedClientId, setSelectedClientId] = useState("");
+  const [selectedFile, setSelectedFile] =
+    useState<globalThis.File | null>(null);
+
+  const [selectedClientId, setSelectedClientId] =
+    useState("");
 
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
@@ -108,10 +123,12 @@ export default function FilesPage() {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || "Failed to load files.");
+        throw new Error(
+          data.error || "Failed to load files.",
+        );
       }
 
-      setFiles(data);
+      setFiles(Array.isArray(data) ? data : []);
     } catch (err) {
       console.error(err);
 
@@ -135,10 +152,12 @@ export default function FilesPage() {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || "Failed to load clients.");
+        throw new Error(
+          data.error || "Failed to load clients.",
+        );
       }
 
-      setClients(data);
+      setClients(Array.isArray(data) ? data : []);
     } catch (err) {
       console.error("Failed to load clients:", err);
     }
@@ -154,7 +173,8 @@ export default function FilesPage() {
 
     return files.filter((file) => {
       const matchesType =
-        typeFilter === "ALL" || file.type === typeFilter;
+        typeFilter === "ALL" ||
+        file.type === typeFilter;
 
       if (!matchesType) {
         return false;
@@ -169,9 +189,12 @@ export default function FilesPage() {
         file.originalName,
         file.mimeType,
         file.type,
+        file.client?.name,
+        file.client?.email,
+        file.client?.phone,
         file.client?.companyName,
-        file.client?.user.name,
-        file.client?.user.email,
+        file.client?.city,
+        file.client?.province,
         file.uploadedBy?.name,
         file.uploadedBy?.email,
         file.booking?.reference,
@@ -186,7 +209,11 @@ export default function FilesPage() {
   }, [files, search, typeFilter]);
 
   const totalSize = useMemo(
-    () => files.reduce((total, file) => total + file.size, 0),
+    () =>
+      files.reduce(
+        (total, file) => total + file.size,
+        0,
+      ),
     [files],
   );
 
@@ -210,14 +237,19 @@ export default function FilesPage() {
     setSuccess("");
   }
 
-  function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0] ?? null;
+  function handleFileChange(
+    event: ChangeEvent<HTMLInputElement>,
+  ) {
+    const file =
+      event.target.files?.[0] ?? null;
 
     setSelectedFile(file);
     setError("");
   }
 
-  async function uploadFile(event: FormEvent<HTMLFormElement>) {
+  async function uploadFile(
+    event: FormEvent<HTMLFormElement>,
+  ) {
     event.preventDefault();
 
     if (!selectedFile) {
@@ -235,7 +267,10 @@ export default function FilesPage() {
       formData.append("file", selectedFile);
 
       if (selectedClientId) {
-        formData.append("clientId", selectedClientId);
+        formData.append(
+          "clientId",
+          selectedClientId,
+        );
       }
 
       const response = await fetch("/api/files", {
@@ -246,12 +281,20 @@ export default function FilesPage() {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || "Failed to upload file.");
+        throw new Error(
+          data.error || "Failed to upload file.",
+        );
       }
 
-      setFiles((current) => [data, ...current]);
+      setFiles((current) => [
+        data,
+        ...current,
+      ]);
 
-      setSuccess("File uploaded successfully.");
+      setSuccess(
+        "File uploaded successfully.",
+      );
+
       setSelectedFile(null);
       setSelectedClientId("");
 
@@ -272,7 +315,9 @@ export default function FilesPage() {
     }
   }
 
-  async function deleteFile(file: FileRecord) {
+  async function deleteFile(
+    file: FileRecord,
+  ) {
     const confirmed = window.confirm(
       `Delete "${file.originalName}"? This cannot be undone.`,
     );
@@ -286,7 +331,9 @@ export default function FilesPage() {
       setError("");
 
       const response = await fetch(
-        `/api/files?id=${encodeURIComponent(file.id)}`,
+        `/api/files?id=${encodeURIComponent(
+          file.id,
+        )}`,
         {
           method: "DELETE",
         },
@@ -295,14 +342,21 @@ export default function FilesPage() {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || "Failed to delete file.");
+        throw new Error(
+          data.error || "Failed to delete file.",
+        );
       }
 
       setFiles((current) =>
-        current.filter((currentFile) => currentFile.id !== file.id),
+        current.filter(
+          (currentFile) =>
+            currentFile.id !== file.id,
+        ),
       );
 
-      setSuccess("File deleted successfully.");
+      setSuccess(
+        "File deleted successfully.",
+      );
 
       window.setTimeout(() => {
         setSuccess("");
@@ -320,10 +374,16 @@ export default function FilesPage() {
     }
   }
 
-  function downloadFile(file: FileRecord) {
-    const link = document.createElement("a");
+  function downloadFile(
+    file: FileRecord,
+  ) {
+    const link =
+      document.createElement("a");
 
-    link.href = `/api/files/${encodeURIComponent(file.id)}/download`;
+    link.href = `/api/files/${encodeURIComponent(
+      file.id,
+    )}/download`;
+
     link.download = file.originalName;
     link.target = "_blank";
     link.rel = "noopener noreferrer";
@@ -335,26 +395,13 @@ export default function FilesPage() {
 
   return (
     <main className="min-h-screen overflow-hidden bg-[#050505] text-white">
-      {/* Ambient background */}
-      <div className="pointer-events-none fixed inset-0">
+      <div className="pointer-events-none fixed inset-0 -z-10">
         <div className="absolute -left-40 -top-40 h-[500px] w-[500px] rounded-full bg-[#b89235]/[0.06] blur-[140px]" />
 
         <div className="absolute -bottom-40 -right-40 h-[500px] w-[500px] rounded-full bg-[#8a6a22]/[0.05] blur-[140px]" />
-
-        <div
-          className="absolute inset-0 opacity-[0.025]"
-          style={{
-            backgroundImage: `
-              linear-gradient(rgba(255,255,255,0.5) 1px, transparent 1px),
-              linear-gradient(90deg, rgba(255,255,255,0.5) 1px, transparent 1px)
-            `,
-            backgroundSize: "80px 80px",
-          }}
-        />
       </div>
 
       <div className="relative mx-auto max-w-[1600px] px-5 py-8 sm:px-8 lg:px-10 lg:py-10">
-        {/* Header */}
         <div className="flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
           <div>
             <p className="mb-3 text-xs font-medium uppercase tracking-[0.2em] text-[#c5a34a]/70">
@@ -366,21 +413,21 @@ export default function FilesPage() {
             </h1>
 
             <p className="mt-3 max-w-xl text-sm leading-6 text-white/35">
-              Upload, organize and manage company documents, media and client
-              files.
+              Upload, organise and manage company
+              documents, media and client files.
             </p>
           </div>
 
           <button
+            type="button"
             onClick={openUploadModal}
-            className="flex items-center justify-center gap-2 rounded-xl bg-[#c5a34a] px-5 py-3 text-sm font-semibold text-black transition hover:bg-[#d4b45c] active:scale-[0.98]"
+            className="flex items-center justify-center gap-2 rounded-xl bg-[#c5a34a] px-5 py-3 text-sm font-semibold text-black transition hover:bg-[#d4b45c]"
           >
             <Plus size={17} />
             Upload File
           </button>
         </div>
 
-        {/* Global messages */}
         {error && !modalOpen && (
           <div className="mt-6 rounded-xl border border-red-500/20 bg-red-500/[0.06] px-4 py-3 text-sm text-red-300">
             {error}
@@ -393,7 +440,6 @@ export default function FilesPage() {
           </div>
         )}
 
-        {/* Stats */}
         <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <StatCard
             icon={<HardDrive size={19} />}
@@ -405,7 +451,10 @@ export default function FilesPage() {
             icon={<FileImage size={19} />}
             label="Photos"
             value={files
-              .filter((file) => file.type === "PHOTO")
+              .filter(
+                (file) =>
+                  file.type === "PHOTO",
+              )
               .length.toString()}
           />
 
@@ -415,9 +464,12 @@ export default function FilesPage() {
             value={files
               .filter(
                 (file) =>
-                  file.type === "DOCUMENT" ||
-                  file.type === "CONTRACT" ||
-                  file.type === "INVOICE",
+                  file.type ===
+                    "DOCUMENT" ||
+                  file.type ===
+                    "CONTRACT" ||
+                  file.type ===
+                    "INVOICE",
               )
               .length.toString()}
           />
@@ -425,29 +477,31 @@ export default function FilesPage() {
           <StatCard
             icon={<Users size={19} />}
             label="Clients With Files"
-            value={
-              new Set(
-                files
-                  .map((file) => file.clientId)
-                  .filter(Boolean),
-              ).size.toString()
-            }
+            value={new Set(
+              files
+                .map(
+                  (file) =>
+                    file.clientId,
+                )
+                .filter(Boolean),
+            ).size.toString()}
           />
         </div>
 
-        {/* File directory */}
         <section className="mt-6 overflow-hidden rounded-2xl border border-white/[0.07] bg-[#0b0b0b]/90">
-          {/* Toolbar */}
           <div className="border-b border-white/[0.06] p-5">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
               <div>
-                <h2 className="text-sm font-semibold text-white">
+                <h2 className="text-sm font-semibold">
                   Company Files
                 </h2>
 
                 <p className="mt-1 text-xs text-white/30">
                   {filteredFiles.length} file
-                  {filteredFiles.length === 1 ? "" : "s"} found
+                  {filteredFiles.length === 1
+                    ? ""
+                    : "s"}{" "}
+                  found
                   {files.length > 0 && (
                     <>
                       {" "}
@@ -466,30 +520,45 @@ export default function FilesPage() {
 
                   <input
                     value={search}
-                    onChange={(event) => setSearch(event.target.value)}
+                    onChange={(event) =>
+                      setSearch(
+                        event.target.value,
+                      )
+                    }
                     placeholder="Search files..."
-                    className="w-full rounded-xl border border-white/[0.07] bg-white/[0.025] py-2.5 pl-10 pr-4 text-sm text-white outline-none placeholder:text-white/20 transition focus:border-[#c5a34a]/30"
+                    className="w-full rounded-xl border border-white/[0.07] bg-white/[0.025] py-2.5 pl-10 pr-4 text-sm text-white outline-none placeholder:text-white/20 focus:border-[#c5a34a]/30"
                   />
                 </div>
 
                 <select
                   value={typeFilter}
                   onChange={(event) =>
-                    setTypeFilter(event.target.value as FileTypeFilter)
+                    setTypeFilter(
+                      event.target
+                        .value as FileTypeFilter,
+                    )
                   }
-                  className="rounded-xl border border-white/[0.07] bg-[#111] px-4 py-2.5 text-sm text-white/60 outline-none transition focus:border-[#c5a34a]/30"
+                  className="rounded-xl border border-white/[0.07] bg-[#111] px-4 py-2.5 text-sm text-white/60 outline-none focus:border-[#c5a34a]/30"
                 >
-                  {fileTypeFilters.map((type) => (
-                    <option key={type} value={type}>
-                      {type === "ALL" ? "All Types" : formatFileType(type)}
-                    </option>
-                  ))}
+                  {fileTypeFilters.map(
+                    (type) => (
+                      <option
+                        key={type}
+                        value={type}
+                      >
+                        {type === "ALL"
+                          ? "All Types"
+                          : formatFileType(
+                              type,
+                            )}
+                      </option>
+                    ),
+                  )}
                 </select>
               </div>
             </div>
           </div>
 
-          {/* Loading */}
           {loading ? (
             <div className="flex min-h-[360px] items-center justify-center">
               <div className="text-center">
@@ -500,66 +569,55 @@ export default function FilesPage() {
                 </p>
               </div>
             </div>
-          ) : filteredFiles.length === 0 ? (
+          ) : filteredFiles.length ===
+            0 ? (
             <div className="flex min-h-[360px] items-center justify-center p-8">
               <div className="max-w-sm text-center">
-                <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl border border-white/[0.07] bg-white/[0.025]">
-                  <File
-                    size={25}
-                    strokeWidth={1.5}
-                    className="text-white/25"
-                  />
-                </div>
+                <File
+                  size={28}
+                  className="mx-auto text-white/20"
+                />
 
                 <h3 className="mt-5 text-sm font-medium text-white/70">
-                  {search || typeFilter !== "ALL"
+                  {search ||
+                  typeFilter !== "ALL"
                     ? "No files found"
                     : "No files uploaded"}
                 </h3>
 
                 <p className="mt-2 text-xs leading-5 text-white/25">
-                  {search || typeFilter !== "ALL"
+                  {search ||
+                  typeFilter !== "ALL"
                     ? "Try a different search or file type."
                     : "Upload your first file to start building your company file library."}
                 </p>
-
-                {!search && typeFilter === "ALL" && (
-                  <button
-                    onClick={openUploadModal}
-                    className="mt-6 inline-flex items-center gap-2 rounded-xl bg-[#c5a34a] px-5 py-2.5 text-xs font-semibold text-black transition hover:bg-[#d4b45c]"
-                  >
-                    <Upload size={15} />
-                    Upload First File
-                  </button>
-                )}
               </div>
             </div>
           ) : (
             <>
-              {/* Desktop table */}
               <div className="hidden overflow-x-auto lg:block">
                 <table className="w-full text-left">
                   <thead className="border-b border-white/[0.06] bg-white/[0.015]">
                     <tr>
-                      <th className="px-6 py-4 text-[10px] font-medium uppercase tracking-[0.16em] text-white/25">
+                      <TableHeading>
                         File
-                      </th>
+                      </TableHeading>
 
-                      <th className="px-6 py-4 text-[10px] font-medium uppercase tracking-[0.16em] text-white/25">
+                      <TableHeading>
                         Type
-                      </th>
+                      </TableHeading>
 
-                      <th className="px-6 py-4 text-[10px] font-medium uppercase tracking-[0.16em] text-white/25">
+                      <TableHeading>
                         Client
-                      </th>
+                      </TableHeading>
 
-                      <th className="px-6 py-4 text-[10px] font-medium uppercase tracking-[0.16em] text-white/25">
+                      <TableHeading>
                         Uploaded By
-                      </th>
+                      </TableHeading>
 
-                      <th className="px-6 py-4 text-[10px] font-medium uppercase tracking-[0.16em] text-white/25">
+                      <TableHeading>
                         Date
-                      </th>
+                      </TableHeading>
 
                       <th className="px-6 py-4 text-right text-[10px] font-medium uppercase tracking-[0.16em] text-white/25">
                         Actions
@@ -568,205 +626,232 @@ export default function FilesPage() {
                   </thead>
 
                   <tbody>
-                    {filteredFiles.map((file) => (
-                      <tr
-                        key={file.id}
-                        className="border-b border-white/[0.04] transition hover:bg-white/[0.02]"
-                      >
-                        <td className="px-6 py-5">
-                          <div className="flex min-w-[280px] items-center gap-3">
-                            <FileIcon type={file.type} />
+                    {filteredFiles.map(
+                      (file) => (
+                        <tr
+                          key={file.id}
+                          className="border-b border-white/[0.04] transition hover:bg-white/[0.02]"
+                        >
+                          <td className="px-6 py-5">
+                            <div className="flex min-w-[280px] items-center gap-3">
+                              <FileIcon
+                                type={
+                                  file.type
+                                }
+                              />
 
-                            <div className="min-w-0">
-                              <p className="truncate text-sm font-medium text-white/80">
-                                {file.originalName}
-                              </p>
+                              <div className="min-w-0">
+                                <p className="truncate text-sm font-medium text-white/80">
+                                  {
+                                    file.originalName
+                                  }
+                                </p>
 
-                              <p className="mt-1 text-xs text-white/25">
-                                {formatBytes(file.size)} · {file.mimeType}
-                              </p>
+                                <p className="mt-1 text-xs text-white/25">
+                                  {formatBytes(
+                                    file.size,
+                                  )}{" "}
+                                  ·{" "}
+                                  {
+                                    file.mimeType
+                                  }
+                                </p>
+                              </div>
                             </div>
-                          </div>
-                        </td>
+                          </td>
 
-                        <td className="px-6 py-5">
-                          <FileTypeBadge type={file.type} />
-                        </td>
+                          <td className="px-6 py-5">
+                            <FileTypeBadge
+                              type={
+                                file.type
+                              }
+                            />
+                          </td>
 
-                        <td className="px-6 py-5">
-                          {file.client ? (
-                            <div>
-                              <p className="text-sm text-white/60">
-                                {file.client.companyName ||
-                                  file.client.user.name ||
-                                  "Private Client"}
-                              </p>
+                          <td className="px-6 py-5">
+                            {file.client ? (
+                              <div>
+                                <p className="text-sm text-white/60">
+                                  {file
+                                    .client
+                                    .companyName ||
+                                    file
+                                      .client
+                                      .name}
+                                </p>
 
-                              <p className="mt-1 text-xs text-white/25">
-                                {file.client.user.email}
-                              </p>
-                            </div>
-                          ) : (
-                            <span className="text-xs text-white/25">
-                              Unassigned
-                            </span>
-                          )}
-                        </td>
+                                <p className="mt-1 text-xs text-white/25">
+                                  {
+                                    file
+                                      .client
+                                      .email
+                                  }
+                                </p>
+                              </div>
+                            ) : (
+                              <span className="text-xs text-white/25">
+                                Unassigned
+                              </span>
+                            )}
+                          </td>
 
-                        <td className="px-6 py-5">
-                          <div>
+                          <td className="px-6 py-5">
                             <p className="text-sm text-white/50">
-                              {file.uploadedBy?.name || "System"}
+                              {file
+                                .uploadedBy
+                                ?.name ||
+                                "System"}
                             </p>
 
-                            {file.uploadedBy?.email && (
+                            {file
+                              .uploadedBy
+                              ?.email && (
                               <p className="mt-1 text-xs text-white/20">
-                                {file.uploadedBy.email}
+                                {
+                                  file
+                                    .uploadedBy
+                                    .email
+                                }
                               </p>
                             )}
-                          </div>
-                        </td>
+                          </td>
 
-                        <td className="px-6 py-5">
-                          <p className="text-xs text-white/40">
-                            {formatDate(file.createdAt)}
-                          </p>
-                        </td>
+                          <td className="px-6 py-5 text-xs text-white/40">
+                            {formatDate(
+                              file.createdAt,
+                            )}
+                          </td>
 
-                        <td className="px-6 py-5">
-                          <div className="flex justify-end gap-2">
-                            <button
-                              onClick={() => downloadFile(file)}
-                              title="Download"
-                              className="rounded-lg border border-white/[0.07] p-2 text-white/35 transition hover:border-[#c5a34a]/20 hover:bg-[#c5a34a]/[0.05] hover:text-[#d4b45c]"
-                            >
-                              <Download size={15} />
-                            </button>
+                          <td className="px-6 py-5">
+                            <div className="flex justify-end gap-2">
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  downloadFile(
+                                    file,
+                                  )
+                                }
+                                className="rounded-lg border border-white/[0.07] p-2 text-white/35 transition hover:text-[#d4b45c]"
+                              >
+                                <Download
+                                  size={
+                                    15
+                                  }
+                                />
+                              </button>
 
-                            <button
-                              onClick={() => deleteFile(file)}
-                              disabled={deletingId === file.id}
-                              title="Delete"
-                              className="rounded-lg border border-white/[0.07] p-2 text-white/25 transition hover:border-red-500/20 hover:bg-red-500/[0.05] hover:text-red-400 disabled:cursor-not-allowed disabled:opacity-40"
-                            >
-                              {deletingId === file.id ? (
-                                <span className="block h-[15px] w-[15px] animate-spin rounded-full border border-white/10 border-t-red-400" />
-                              ) : (
-                                <Trash2 size={15} />
-                              )}
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  deleteFile(
+                                    file,
+                                  )
+                                }
+                                disabled={
+                                  deletingId ===
+                                  file.id
+                                }
+                                className="rounded-lg border border-white/[0.07] p-2 text-white/25 transition hover:text-red-400 disabled:opacity-40"
+                              >
+                                {deletingId ===
+                                file.id ? (
+                                  <span className="block h-[15px] w-[15px] animate-spin rounded-full border border-white/10 border-t-red-400" />
+                                ) : (
+                                  <Trash2
+                                    size={
+                                      15
+                                    }
+                                  />
+                                )}
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ),
+                    )}
                   </tbody>
                 </table>
               </div>
 
-              {/* Mobile/tablet cards */}
               <div className="grid gap-3 p-4 lg:hidden">
-                {filteredFiles.map((file) => (
-                  <div
-                    key={file.id}
-                    className="rounded-xl border border-white/[0.06] bg-white/[0.015] p-4"
-                  >
-                    <div className="flex items-start gap-3">
-                      <FileIcon type={file.type} />
+                {filteredFiles.map(
+                  (file) => (
+                    <div
+                      key={file.id}
+                      className="rounded-xl border border-white/[0.06] bg-white/[0.015] p-4"
+                    >
+                      <div className="flex items-start gap-3">
+                        <FileIcon
+                          type={file.type}
+                        />
 
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-medium text-white/80">
-                          {file.originalName}
-                        </p>
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-medium text-white/80">
+                            {
+                              file.originalName
+                            }
+                          </p>
 
-                        <p className="mt-1 text-xs text-white/25">
-                          {formatBytes(file.size)} · {formatDate(file.createdAt)}
-                        </p>
+                          <p className="mt-1 text-xs text-white/25">
+                            {formatBytes(
+                              file.size,
+                            )}{" "}
+                            ·{" "}
+                            {formatDate(
+                              file.createdAt,
+                            )}
+                          </p>
 
-                        <div className="mt-3 flex flex-wrap items-center gap-2">
-                          <FileTypeBadge type={file.type} />
+                          <div className="mt-3 flex flex-wrap gap-2">
+                            <FileTypeBadge
+                              type={
+                                file.type
+                              }
+                            />
 
-                          {file.client && (
-                            <span className="rounded-full border border-white/[0.07] bg-white/[0.025] px-2.5 py-1 text-[10px] text-white/35">
-                              {file.client.companyName ||
-                                file.client.user.name ||
-                                "Client"}
-                            </span>
-                          )}
+                            {file.client && (
+                              <span className="rounded-full border border-white/[0.07] bg-white/[0.025] px-2.5 py-1 text-[10px] text-white/35">
+                                {file
+                                  .client
+                                  .companyName ||
+                                  file
+                                    .client
+                                    .name}
+                              </span>
+                            )}
+                          </div>
                         </div>
-
-                        <p className="mt-3 text-xs text-white/25">
-                          Uploaded by{" "}
-                          <span className="text-white/40">
-                            {file.uploadedBy?.name || "System"}
-                          </span>
-                        </p>
-                      </div>
-
-                      <div className="flex shrink-0 gap-1">
-                        <button
-                          onClick={() => downloadFile(file)}
-                          className="rounded-lg p-2 text-white/30 transition hover:bg-white/[0.05] hover:text-[#d4b45c]"
-                          title="Download"
-                        >
-                          <Download size={16} />
-                        </button>
-
-                        <button
-                          onClick={() => deleteFile(file)}
-                          disabled={deletingId === file.id}
-                          className="rounded-lg p-2 text-white/25 transition hover:bg-red-500/[0.05] hover:text-red-400 disabled:opacity-40"
-                          title="Delete"
-                        >
-                          <Trash2 size={16} />
-                        </button>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  ),
+                )}
               </div>
             </>
           )}
         </section>
-
-        {/* Activity preview */}
-        <section className="mt-6 rounded-2xl border border-white/[0.07] bg-[#0b0b0b]/90 p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-sm font-semibold text-white">
-                File Activity
-              </h2>
-
-              <p className="mt-1 text-xs text-white/30">
-                Recent file activity will appear here once authentication and
-                activity logging are connected.
-              </p>
-            </div>
-
-            <HardDrive size={20} className="text-white/15" />
-          </div>
-        </section>
       </div>
 
-      {/* Upload modal */}
       {modalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/75 p-4 backdrop-blur-md">
           <div className="my-8 w-full max-w-xl overflow-hidden rounded-2xl border border-white/[0.08] bg-[#0b0b0b] shadow-2xl">
-            {/* Modal header */}
             <div className="flex items-center justify-between border-b border-white/[0.07] px-6 py-5">
               <div>
                 <p className="text-xs uppercase tracking-[0.18em] text-[#c5a34a]/70">
                   File Management
                 </p>
 
-                <h2 className="mt-1 text-lg font-semibold text-white">
+                <h2 className="mt-1 text-lg font-semibold">
                   Upload File
                 </h2>
               </div>
 
               <button
-                onClick={closeUploadModal}
+                type="button"
+                onClick={
+                  closeUploadModal
+                }
                 disabled={uploading}
-                className="rounded-xl p-2 text-white/30 transition hover:bg-white/[0.05] hover:text-white disabled:cursor-not-allowed"
+                className="rounded-xl p-2 text-white/30 hover:bg-white/[0.05] hover:text-white disabled:opacity-40"
               >
                 <X size={18} />
               </button>
@@ -786,36 +871,41 @@ export default function FilesPage() {
                   </div>
                 )}
 
-                {/* File picker */}
                 <label className="block cursor-pointer">
                   <span className="mb-2 block text-xs font-medium text-white/45">
-                    File <span className="text-[#c5a34a]">*</span>
+                    File{" "}
+                    <span className="text-[#c5a34a]">
+                      *
+                    </span>
                   </span>
 
                   <input
                     type="file"
-                    onChange={handleFileChange}
+                    onChange={
+                      handleFileChange
+                    }
                     disabled={uploading}
                     className="hidden"
                   />
 
-                  <div className="rounded-2xl border border-dashed border-white/[0.1] bg-white/[0.02] p-8 text-center transition hover:border-[#c5a34a]/30 hover:bg-[#c5a34a]/[0.02]">
-                    <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border border-[#c5a34a]/15 bg-[#c5a34a]/[0.06] text-[#c5a34a]">
-                      <Upload size={22} />
-                    </div>
+                  <div className="rounded-2xl border border-dashed border-white/[0.1] bg-white/[0.02] p-8 text-center transition hover:border-[#c5a34a]/30">
+                    <Upload
+                      size={22}
+                      className="mx-auto text-[#c5a34a]"
+                    />
 
                     {selectedFile ? (
                       <>
-                        <p className="mt-4 truncate px-4 text-sm font-medium text-white/70">
-                          {selectedFile.name}
+                        <p className="mt-4 truncate text-sm font-medium text-white/70">
+                          {
+                            selectedFile.name
+                          }
                         </p>
 
                         <p className="mt-1 text-xs text-white/30">
-                          {formatBytes(selectedFile.size)}
-                        </p>
-
-                        <p className="mt-3 text-[11px] text-[#c5a34a]/70">
-                          Click to choose a different file
+                          {formatBytes(
+                            selectedFile.size,
+                          )}
                         </p>
                       </>
                     ) : (
@@ -825,14 +915,14 @@ export default function FilesPage() {
                         </p>
 
                         <p className="mt-1 text-xs text-white/25">
-                          Click here to browse files on your computer.
+                          Click here to
+                          browse files.
                         </p>
                       </>
                     )}
                   </div>
                 </label>
 
-                {/* Client */}
                 <div className="mt-5">
                   <label className="block">
                     <span className="mb-2 block text-xs font-medium text-white/45">
@@ -840,59 +930,70 @@ export default function FilesPage() {
                     </span>
 
                     <select
-                      value={selectedClientId}
+                      value={
+                        selectedClientId
+                      }
                       onChange={(event) =>
-                        setSelectedClientId(event.target.value)
+                        setSelectedClientId(
+                          event.target
+                            .value,
+                        )
                       }
                       disabled={uploading}
-                      className="w-full rounded-xl border border-white/[0.08] bg-[#111] px-4 py-3 text-sm text-white/60 outline-none transition focus:border-[#c5a34a]/30"
+                      className="w-full rounded-xl border border-white/[0.08] bg-[#111] px-4 py-3 text-sm text-white/60 outline-none focus:border-[#c5a34a]/30"
                     >
-                      <option value="">No client / unassigned</option>
+                      <option value="">
+                        No client /
+                        unassigned
+                      </option>
 
-                      {clients.map((client) => (
-                        <option key={client.id} value={client.id}>
-                          {client.companyName ||
-                            client.user.name ||
-                            client.user.email}
-                        </option>
-                      ))}
+                      {clients.map(
+                        (client) => (
+                          <option
+                            key={
+                              client.id
+                            }
+                            value={
+                              client.id
+                            }
+                          >
+                            {client.companyName ||
+                              client.name}{" "}
+                            —{" "}
+                            {client.email}
+                          </option>
+                        ),
+                      )}
                     </select>
                   </label>
                 </div>
-
-                <p className="mt-5 text-xs leading-5 text-white/20">
-                  Files are stored in the local uploads directory and their
-                  metadata is saved in PostgreSQL.
-                </p>
               </div>
 
-              {/* Footer */}
               <div className="flex flex-col-reverse gap-3 border-t border-white/[0.07] p-5 sm:flex-row sm:justify-end">
                 <button
                   type="button"
-                  onClick={closeUploadModal}
+                  onClick={
+                    closeUploadModal
+                  }
                   disabled={uploading}
-                  className="rounded-xl border border-white/[0.08] px-5 py-3 text-sm font-medium text-white/50 transition hover:bg-white/[0.04] hover:text-white disabled:cursor-not-allowed"
+                  className="rounded-xl border border-white/[0.08] px-5 py-3 text-sm text-white/50"
                 >
                   Cancel
                 </button>
 
                 <button
                   type="submit"
-                  disabled={uploading || !selectedFile}
-                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#c5a34a] px-6 py-3 text-sm font-semibold text-black transition hover:bg-[#d4b45c] disabled:cursor-not-allowed disabled:opacity-50"
+                  disabled={
+                    uploading ||
+                    !selectedFile
+                  }
+                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#c5a34a] px-6 py-3 text-sm font-semibold text-black disabled:opacity-50"
                 >
-                  {uploading ? (
-                    <>
-                      <span className="h-4 w-4 animate-spin rounded-full border-2 border-black/20 border-t-black" />
-                      Uploading...
-                    </>
-                  ) : (
-                    <>
-                      <Upload size={16} />
-                      Upload File
-                    </>
-                  )}
+                  <Upload size={16} />
+
+                  {uploading
+                    ? "Uploading..."
+                    : "Upload File"}
                 </button>
               </div>
             </form>
@@ -900,6 +1001,18 @@ export default function FilesPage() {
         </div>
       )}
     </main>
+  );
+}
+
+function TableHeading({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <th className="px-6 py-4 text-[10px] font-medium uppercase tracking-[0.16em] text-white/25">
+      {children}
+    </th>
   );
 }
 
@@ -924,7 +1037,9 @@ function StatCard({
             {label}
           </p>
 
-          <p className="mt-1 text-2xl font-semibold">{value}</p>
+          <p className="mt-1 text-2xl font-semibold">
+            {value}
+          </p>
         </div>
       </div>
     </div>
@@ -983,11 +1098,15 @@ function FileTypeBadge({
   );
 }
 
-function formatFileType(type: string) {
+function formatFileType(
+  type: string,
+) {
   return type
     .toLowerCase()
     .replaceAll("_", " ")
-    .replace(/\b\w/g, (letter) => letter.toUpperCase());
+    .replace(/\b\w/g, (letter) =>
+      letter.toUpperCase(),
+    );
 }
 
 function formatBytes(bytes: number) {
@@ -995,19 +1114,42 @@ function formatBytes(bytes: number) {
     return "0 Bytes";
   }
 
-  const units = ["Bytes", "KB", "MB", "GB", "TB"];
-  const index = Math.floor(Math.log(bytes) / Math.log(1024));
+  const units = [
+    "Bytes",
+    "KB",
+    "MB",
+    "GB",
+    "TB",
+  ];
 
-  return `${(bytes / Math.pow(1024, index)).toFixed(index === 0 ? 0 : 1)} ${
+  const index = Math.floor(
+    Math.log(bytes) /
+      Math.log(1024),
+  );
+
+  return `${(
+    bytes /
+    Math.pow(1024, index)
+  ).toFixed(index === 0 ? 0 : 1)} ${
     units[index] || "Bytes"
   }`;
 }
 
 function formatDate(date: string) {
-  return new Intl.DateTimeFormat("en-ZA", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  }).format(new Date(date));
-}
+  const value = new Date(date);
 
+  if (
+    Number.isNaN(value.getTime())
+  ) {
+    return "Unknown";
+  }
+
+  return new Intl.DateTimeFormat(
+    "en-ZA",
+    {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    },
+  ).format(value);
+}

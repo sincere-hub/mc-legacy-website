@@ -7,16 +7,240 @@ datasource db {
   provider = "postgresql"
 }
 
-/**
- * =========================
- * ENUMS
- * =========================
- */
+model User {
+  id            String         @id @default(cuid())
+  name          String?
+  email         String         @unique
+  passwordHash  String
+  role          Role
+  phone         String?
+  isActive      Boolean        @default(true)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  activities    ActivityLog[]
+  uploadedFiles File[]
+  messagesSent  Message[]      @relation("MessageSender")
+  notifications Notification[]
+
+  @@index([role])
+  @@index([email])
+}
+
+model Client {
+  id          String     @id @default(cuid())
+  companyName String?
+  address     String?
+  city        String?
+  province    String?
+  notes       String?
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  email       String
+  name        String
+  phone       String?
+  bookings    Booking[]
+  contracts   Contract[]
+  enquiries   Enquiry[]
+  files       File[]
+  invoices    Invoice[]
+  messages    Message[]
+  payments    Payment[]
+
+  @@index([email])
+  @@index([companyName])
+}
+
+model Enquiry {
+  id        String        @id @default(cuid())
+  reference String        @unique
+  clientId  String?
+  name      String
+  email     String
+  phone     String
+  service   String
+  eventType String
+  eventDate DateTime?
+  location  String
+  message   String
+  status    BookingStatus @default(NEW)
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+  booking   Booking?
+  client    Client?       @relation(fields: [clientId], references: [id])
+
+  @@index([email])
+  @@index([status])
+  @@index([eventDate])
+}
+
+model Booking {
+  id        String        @id @default(cuid())
+  reference String        @unique
+  clientId  String
+  enquiryId String?       @unique
+  service   String
+  eventType String
+  eventDate DateTime?
+  location  String?
+  notes     String?
+  status    BookingStatus @default(NEW)
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+  client    Client        @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  enquiry   Enquiry?      @relation(fields: [enquiryId], references: [id])
+  contracts Contract[]
+  files     File[]
+  invoices  Invoice[]
+  messages  Message[]
+
+  @@index([clientId])
+  @@index([status])
+  @@index([eventDate])
+}
+
+model File {
+  id           String         @id @default(cuid())
+  name         String
+  originalName String
+  storageKey   String         @unique
+  mimeType     String
+  size         Int
+  type         FileType
+  visibility   FileVisibility @default(PRIVATE)
+  clientId     String?
+  bookingId    String?
+  uploadedById String?
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+  activityLogs ActivityLog[]
+  contract     Contract?      @relation("ContractFile")
+  booking      Booking?       @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  client       Client?        @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  uploadedBy   User?          @relation(fields: [uploadedById], references: [id])
+  invoice      Invoice?       @relation("InvoiceFile")
+
+  @@index([clientId])
+  @@index([bookingId])
+  @@index([type])
+}
+
+model Contract {
+  id        String         @id @default(cuid())
+  title     String
+  reference String         @unique
+  status    ContractStatus @default(DRAFT)
+  clientId  String
+  bookingId String?
+  fileId    String?        @unique
+  signedAt  DateTime?
+  expiresAt DateTime?
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+  booking   Booking?       @relation(fields: [bookingId], references: [id])
+  client    Client         @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  file      File?          @relation("ContractFile", fields: [fileId], references: [id])
+
+  @@index([clientId])
+  @@index([status])
+}
+
+model Invoice {
+  id            String        @id @default(cuid())
+  invoiceNumber String        @unique
+  clientId      String
+  bookingId     String?
+  description   String?
+  subtotal      Decimal       @db.Decimal(12, 2)
+  tax           Decimal       @default(0) @db.Decimal(12, 2)
+  total         Decimal       @db.Decimal(12, 2)
+  amountPaid    Decimal       @default(0) @db.Decimal(12, 2)
+  currency      String        @default("ZAR")
+  status        InvoiceStatus @default(DRAFT)
+  dueDate       DateTime?
+  paidAt        DateTime?
+  fileId        String?       @unique
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  booking       Booking?      @relation(fields: [bookingId], references: [id])
+  client        Client        @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  file          File?         @relation("InvoiceFile", fields: [fileId], references: [id])
+  payments      Payment[]
+
+  @@index([clientId])
+  @@index([status])
+  @@index([dueDate])
+}
+
+model Payment {
+  id                   String   @id @default(cuid())
+  invoiceId            String
+  clientId             String
+  amount               Decimal  @db.Decimal(12, 2)
+  currency             String   @default("ZAR")
+  method               String?
+  transactionReference String?
+  paidAt               DateTime @default(now())
+  createdAt            DateTime @default(now())
+  client               Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  invoice              Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@index([invoiceId])
+  @@index([clientId])
+}
+
+model Message {
+  id        String    @id @default(cuid())
+  clientId  String
+  bookingId String?
+  senderId  String
+  content   String
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+  booking   Booking?  @relation(fields: [bookingId], references: [id])
+  client    Client    @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  sender    User      @relation("MessageSender", fields: [senderId], references: [id], onDelete: Cascade)
+
+  @@index([clientId])
+  @@index([bookingId])
+  @@index([senderId])
+}
+
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String
+  type      NotificationType
+  title     String
+  message   String
+  readAt    DateTime?
+  createdAt DateTime         @default(now())
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([readAt])
+  @@index([createdAt])
+}
+
+model ActivityLog {
+  id          String         @id @default(cuid())
+  action      ActivityAction
+  description String?
+  userId      String?
+  fileId      String?
+  ipAddress   String?
+  userAgent   String?
+  createdAt   DateTime       @default(now())
+  file        File?          @relation(fields: [fileId], references: [id])
+  user        User?          @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([fileId])
+  @@index([action])
+  @@index([createdAt])
+}
 
 enum Role {
   ADMIN
   STAFF
-  CLIENT
 }
 
 enum BookingStatus {
@@ -82,365 +306,4 @@ enum ActivityAction {
   DOWNLOAD
   VIEW
   STATUS_CHANGE
-}
-
-/**
- * =========================
- * USER
- * =========================
- */
-
-model User {
-  id           String  @id @default(cuid())
-  name         String?
-  email        String  @unique
-  passwordHash String
-  role         Role    @default(CLIENT)
-  phone        String?
-  isActive     Boolean @default(true)
-
-  client Client?
-
-  notifications Notification[]
-  activities    ActivityLog[]
-  messagesSent  Message[]      @relation("MessageSender")
-  uploadedFiles File[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([role])
-  @@index([email])
-}
-
-/**
- * =========================
- * CLIENT
- * =========================
- */
-
-model Client {
-  id     String @id @default(cuid())
-  userId String @unique
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  companyName String?
-  address     String?
-  city        String?
-  province    String?
-  notes       String?
-
-  enquiries Enquiry[]
-  bookings  Booking[]
-  files     File[]
-  contracts Contract[]
-  invoices  Invoice[]
-  messages  Message[]
-  payments  Payment[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([companyName])
-}
-
-/**
- * =========================
- * ENQUIRY
- * =========================
- */
-
-model Enquiry {
-  id String @id @default(cuid())
-
-  reference String @unique
-
-  clientId String?
-  client   Client? @relation(fields: [clientId], references: [id], onDelete: SetNull)
-
-  name      String
-  email     String
-  phone     String
-  service   String
-  eventType String
-  eventDate DateTime?
-  location  String
-  message   String
-
-  status BookingStatus @default(NEW)
-
-  booking Booking?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([email])
-  @@index([status])
-  @@index([eventDate])
-}
-
-/**
- * =========================
- * BOOKING
- * =========================
- */
-
-model Booking {
-  id String @id @default(cuid())
-
-  reference String @unique
-
-  clientId String
-  client   Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
-
-  enquiryId String?  @unique
-  enquiry   Enquiry? @relation(fields: [enquiryId], references: [id], onDelete: SetNull)
-
-  service   String
-  eventType String
-  eventDate DateTime?
-  location  String?
-  notes     String?
-
-  status BookingStatus @default(NEW)
-
-  files     File[]
-  contracts Contract[]
-  invoices  Invoice[]
-  messages  Message[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([clientId])
-  @@index([status])
-  @@index([eventDate])
-}
-
-/**
- * =========================
- * FILE
- * =========================
- */
-
-model File {
-  id String @id @default(cuid())
-
-  name         String
-  originalName String
-  storageKey   String @unique
-  mimeType     String
-  size         Int
-
-  type       FileType
-  visibility FileVisibility @default(PRIVATE)
-
-  clientId String?
-  client   Client? @relation(fields: [clientId], references: [id], onDelete: Cascade)
-
-  bookingId String?
-  booking   Booking? @relation(fields: [bookingId], references: [id], onDelete: Cascade)
-
-  uploadedById String?
-  uploadedBy   User?   @relation(fields: [uploadedById], references: [id], onDelete: SetNull)
-
-  activityLogs ActivityLog[]
-
-  contract  Contract? @relation("ContractFile")
-  invoice   Invoice?  @relation("InvoiceFile")
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-
-  @@index([clientId])
-  @@index([bookingId])
-  @@index([type])
-}
-
-/**
- * =========================
- * CONTRACT
- * =========================
- */
-
-model Contract {
-  id String @id @default(cuid())
-
-  title     String
-  reference String @unique
-
-  status ContractStatus @default(DRAFT)
-
-  clientId String
-  client   Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
-
-  bookingId String?
-  booking   Booking? @relation(fields: [bookingId], references: [id], onDelete: SetNull)
-
-  fileId    String?   @unique
-  file      File?     @relation("ContractFile", fields: [fileId], references: [id], onDelete: SetNull)
-  signedAt  DateTime?
-  expiresAt DateTime?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([clientId])
-  @@index([status])
-}
-
-/**
- * =========================
- * INVOICE
- * =========================
- */
-
-model Invoice {
-  id String @id @default(cuid())
-
-  invoiceNumber String @unique
-
-  clientId String
-  client   Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
-
-  bookingId String?
-  booking   Booking? @relation(fields: [bookingId], references: [id], onDelete: SetNull)
-
-  description String?
-
-  subtotal Decimal @db.Decimal(12, 2)
-  tax      Decimal @default(0) @db.Decimal(12, 2)
-  total    Decimal @db.Decimal(12, 2)
-
-  amountPaid Decimal @default(0) @db.Decimal(12, 2)
-
-  currency String @default("ZAR")
-
-  status InvoiceStatus @default(DRAFT)
-
-  dueDate DateTime?
-  paidAt  DateTime?
-
-  fileId   String?   @unique
-  file     File?     @relation("InvoiceFile", fields: [fileId], references: [id], onDelete: SetNull)
-  payments Payment[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([clientId])
-  @@index([status])
-  @@index([dueDate])
-}
-
-/**
- * =========================
- * PAYMENT
- * =========================
- */
-
-model Payment {
-  id String @id @default(cuid())
-
-  invoiceId String
-  invoice   Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
-
-  clientId String
-  client   Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
-
-  amount   Decimal @db.Decimal(12, 2)
-  currency String  @default("ZAR")
-
-  method               String?
-  transactionReference String?
-
-  paidAt DateTime @default(now())
-
-  createdAt DateTime @default(now())
-
-  @@index([invoiceId])
-  @@index([clientId])
-}
-
-/**
- * =========================
- * MESSAGE
- * =========================
- */
-
-model Message {
-  id String @id @default(cuid())
-
-  clientId String
-  client   Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
-
-  bookingId String?
-  booking   Booking? @relation(fields: [bookingId], references: [id], onDelete: SetNull)
-
-  senderId String
-  sender   User   @relation("MessageSender", fields: [senderId], references: [id], onDelete: Cascade)
-
-  content String
-
-  readAt DateTime?
-
-  createdAt DateTime @default(now())
-
-  @@index([clientId])
-  @@index([bookingId])
-  @@index([senderId])
-}
-
-/**
- * =========================
- * NOTIFICATION
- * =========================
- */
-
-model Notification {
-  id String @id @default(cuid())
-
-  userId String
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  type    NotificationType
-  title   String
-  message String
-
-  readAt DateTime?
-
-  createdAt DateTime @default(now())
-
-  @@index([userId])
-  @@index([readAt])
-  @@index([createdAt])
-}
-
-/**
- * =========================
- * ACTIVITY LOG
- * =========================
- */
-
-model ActivityLog {
-  id String @id @default(cuid())
-
-  action ActivityAction
-
-  description String?
-
-  userId String?
-  user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
-
-  fileId String?
-  file   File?   @relation(fields: [fileId], references: [id], onDelete: SetNull)
-
-  ipAddress String?
-  userAgent String?
-
-  createdAt DateTime @default(now())
-
-  @@index([userId])
-  @@index([fileId])
-  @@index([action])
-  @@index([createdAt])
 }

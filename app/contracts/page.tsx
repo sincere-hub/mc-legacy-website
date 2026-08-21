@@ -14,11 +14,12 @@ import { FormEvent, useEffect, useState } from "react";
 
 type Client = {
   id: string;
+  name: string;
+  email: string;
+  phone: string | null;
   companyName: string | null;
-  user: {
-    name: string | null;
-    email: string;
-  };
+  city: string | null;
+  province: string | null;
 };
 
 type Contract = {
@@ -28,15 +29,27 @@ type Contract = {
   status: "DRAFT" | "SENT" | "SIGNED" | "EXPIRED" | "CANCELLED";
   expiresAt: string | null;
   createdAt: string;
+
   client: Client;
+
+  booking?: {
+    id: string;
+    reference: string;
+    service: string;
+    eventType: string;
+    status: string;
+  } | null;
 };
 
 const statusStyles = {
   DRAFT: "border-white/10 bg-white/[0.04] text-white/45",
   SENT: "border-blue-400/20 bg-blue-400/[0.06] text-blue-300",
-  SIGNED: "border-emerald-400/20 bg-emerald-400/[0.06] text-emerald-300",
-  EXPIRED: "border-orange-400/20 bg-orange-400/[0.06] text-orange-300",
-  CANCELLED: "border-red-400/20 bg-red-400/[0.06] text-red-300",
+  SIGNED:
+    "border-emerald-400/20 bg-emerald-400/[0.06] text-emerald-300",
+  EXPIRED:
+    "border-orange-400/20 bg-orange-400/[0.06] text-orange-300",
+  CANCELLED:
+    "border-red-400/20 bg-red-400/[0.06] text-red-300",
 };
 
 export default function ContractsPage() {
@@ -58,24 +71,47 @@ export default function ContractsPage() {
   async function loadData() {
     try {
       setLoading(true);
+      setError("");
 
       const [contractsResponse, clientsResponse] = await Promise.all([
-        fetch("/api/contracts"),
-        fetch("/api/clients"),
+        fetch("/api/contracts", {
+          cache: "no-store",
+        }),
+        fetch("/api/clients", {
+          cache: "no-store",
+        }),
       ]);
-
-      if (!contractsResponse.ok || !clientsResponse.ok) {
-        throw new Error("Failed to load data");
-      }
 
       const contractsData = await contractsResponse.json();
       const clientsData = await clientsResponse.json();
 
-      setContracts(contractsData);
-      setClients(clientsData);
+      if (!contractsResponse.ok) {
+        throw new Error(
+          contractsData.error || "Failed to load contracts.",
+        );
+      }
+
+      if (!clientsResponse.ok) {
+        throw new Error(
+          clientsData.error || "Failed to load clients.",
+        );
+      }
+
+      setContracts(
+        Array.isArray(contractsData) ? contractsData : [],
+      );
+
+      setClients(
+        Array.isArray(clientsData) ? clientsData : [],
+      );
     } catch (err) {
       console.error(err);
-      setError("Unable to load contracts.");
+
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Unable to load contracts.",
+      );
     } finally {
       setLoading(false);
     }
@@ -92,7 +128,9 @@ export default function ContractsPage() {
     }));
   }
 
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(
+    event: FormEvent<HTMLFormElement>,
+  ) {
     event.preventDefault();
 
     setError("");
@@ -110,7 +148,9 @@ export default function ContractsPage() {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || "Failed to create contract");
+        throw new Error(
+          data.error || "Failed to create contract.",
+        );
       }
 
       setForm({
@@ -125,7 +165,9 @@ export default function ContractsPage() {
       await loadData();
     } catch (err) {
       setError(
-        err instanceof Error ? err.message : "Failed to create contract"
+        err instanceof Error
+          ? err.message
+          : "Failed to create contract.",
       );
     } finally {
       setSaving(false);
@@ -133,28 +175,43 @@ export default function ContractsPage() {
   }
 
   const filteredContracts = contracts.filter((contract) => {
-    const query = search.toLowerCase();
+    const query = search.trim().toLowerCase();
 
-    return (
-      contract.title.toLowerCase().includes(query) ||
-      contract.reference.toLowerCase().includes(query) ||
-      contract.client.user.name?.toLowerCase().includes(query) ||
-      contract.client.companyName?.toLowerCase().includes(query)
-    );
+    if (!query) {
+      return true;
+    }
+
+    const searchableText = [
+      contract.title,
+      contract.reference,
+      contract.status,
+      contract.client.name,
+      contract.client.email,
+      contract.client.phone,
+      contract.client.companyName,
+      contract.client.city,
+      contract.client.province,
+    ]
+      .filter(Boolean)
+      .join(" ")
+      .toLowerCase();
+
+    return searchableText.includes(query);
   });
 
   const signedCount = contracts.filter(
-    (contract) => contract.status === "SIGNED"
+    (contract) => contract.status === "SIGNED",
   ).length;
 
   const pendingCount = contracts.filter(
     (contract) =>
-      contract.status === "DRAFT" || contract.status === "SENT"
+      contract.status === "DRAFT" ||
+      contract.status === "SENT",
   ).length;
 
   return (
     <main className="min-h-screen overflow-hidden bg-[#050505] text-white">
-      <div className="pointer-events-none fixed inset-0">
+      <div className="pointer-events-none fixed inset-0 -z-10">
         <div className="absolute -left-40 -top-40 h-[500px] w-[500px] rounded-full bg-[#b89235]/[0.06] blur-[140px]" />
 
         <div className="absolute -bottom-40 -right-40 h-[500px] w-[500px] rounded-full bg-[#8a6a22]/[0.05] blur-[140px]" />
@@ -181,7 +238,10 @@ export default function ContractsPage() {
           <div>
             <div className="mb-4 flex items-center gap-2">
               <div className="flex h-8 w-8 items-center justify-center rounded-lg border border-[#c5a34a]/20 bg-[#c5a34a]/[0.07]">
-                <FileText size={15} className="text-[#c5a34a]" />
+                <FileText
+                  size={15}
+                  className="text-[#c5a34a]"
+                />
               </div>
 
               <span className="text-[10px] uppercase tracking-[0.2em] text-white/30">
@@ -194,12 +254,13 @@ export default function ContractsPage() {
             </h1>
 
             <p className="mt-3 max-w-xl text-sm leading-6 text-white/35">
-              Create, manage and track agreements between MC Legacy and your
-              clients.
+              Create, manage and track agreements between MC
+              Legacy and your clients.
             </p>
           </div>
 
           <motion.button
+            type="button"
             onClick={() => {
               setError("");
               setShowModal(true);
@@ -241,6 +302,12 @@ export default function ContractsPage() {
           ))}
         </div>
 
+        {error && !showModal && (
+          <div className="mt-6 rounded-xl border border-red-500/20 bg-red-500/[0.06] px-4 py-3 text-sm text-red-300">
+            {error}
+          </div>
+        )}
+
         <motion.section
           initial={{ opacity: 0, y: 25 }}
           animate={{ opacity: 1, y: 0 }}
@@ -266,7 +333,9 @@ export default function ContractsPage() {
 
               <input
                 value={search}
-                onChange={(event) => setSearch(event.target.value)}
+                onChange={(event) =>
+                  setSearch(event.target.value)
+                }
                 placeholder="Search contracts..."
                 className="h-11 w-full rounded-xl border border-white/[0.07] bg-white/[0.025] pl-10 pr-4 text-sm text-white outline-none transition placeholder:text-white/20 hover:border-white/[0.12] focus:border-[#c5a34a]/40 focus:bg-white/[0.04]"
               />
@@ -282,93 +351,144 @@ export default function ContractsPage() {
               <table className="w-full min-w-[850px] text-left">
                 <thead>
                   <tr className="border-b border-white/[0.06] text-xs uppercase tracking-[0.12em] text-white/25">
-                    <th className="px-6 py-4 font-medium">Contract</th>
-                    <th className="px-6 py-4 font-medium">Client</th>
-                    <th className="px-6 py-4 font-medium">Status</th>
-                    <th className="px-6 py-4 font-medium">Created</th>
-                    <th className="px-6 py-4 font-medium">Expires</th>
+                    <th className="px-6 py-4 font-medium">
+                      Contract
+                    </th>
+
+                    <th className="px-6 py-4 font-medium">
+                      Client
+                    </th>
+
+                    <th className="px-6 py-4 font-medium">
+                      Status
+                    </th>
+
+                    <th className="px-6 py-4 font-medium">
+                      Created
+                    </th>
+
+                    <th className="px-6 py-4 font-medium">
+                      Expires
+                    </th>
+
                     <th className="px-6 py-4" />
                   </tr>
                 </thead>
 
                 <tbody>
-                  {filteredContracts.map((contract, index) => (
-                    <motion.tr
-                      key={contract.id}
-                      initial={{ opacity: 0, y: 8 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: index * 0.05 }}
-                      className="border-b border-white/[0.05] last:border-0 hover:bg-white/[0.02]"
-                    >
-                      <td className="px-6 py-5">
-                        <div className="font-medium text-white/80">
-                          {contract.title}
-                        </div>
-
-                        <div className="mt-1 font-mono text-[11px] text-white/25">
-                          {contract.reference}
-                        </div>
-                      </td>
-
-                      <td className="px-6 py-5">
-                        <div className="flex items-center gap-3">
-                          <div className="flex h-9 w-9 items-center justify-center rounded-lg border border-white/[0.07] bg-white/[0.03]">
-                            <User size={15} className="text-white/30" />
+                  {filteredContracts.map(
+                    (contract, index) => (
+                      <motion.tr
+                        key={contract.id}
+                        initial={{
+                          opacity: 0,
+                          y: 8,
+                        }}
+                        animate={{
+                          opacity: 1,
+                          y: 0,
+                        }}
+                        transition={{
+                          delay: index * 0.05,
+                        }}
+                        className="border-b border-white/[0.05] last:border-0 hover:bg-white/[0.02]"
+                      >
+                        <td className="px-6 py-5">
+                          <div className="font-medium text-white/80">
+                            {contract.title}
                           </div>
 
-                          <div>
-                            <div className="text-sm text-white/65">
-                              {contract.client.user.name ||
-                                "Unnamed client"}
+                          <div className="mt-1 font-mono text-[11px] text-white/25">
+                            {contract.reference}
+                          </div>
+                        </td>
+
+                        <td className="px-6 py-5">
+                          <div className="flex items-center gap-3">
+                            <div className="flex h-9 w-9 items-center justify-center rounded-lg border border-white/[0.07] bg-white/[0.03]">
+                              <User
+                                size={15}
+                                className="text-white/30"
+                              />
                             </div>
 
-                            <div className="mt-1 text-xs text-white/25">
-                              {contract.client.companyName ||
-                                contract.client.user.email}
+                            <div>
+                              <div className="text-sm text-white/65">
+                                {contract.client
+                                  .companyName ||
+                                  contract.client.name}
+                              </div>
+
+                              <div className="mt-1 text-xs text-white/25">
+                                {contract.client
+                                  .companyName
+                                  ? contract.client.name
+                                  : contract.client.email}
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      </td>
+                        </td>
 
-                      <td className="px-6 py-5">
-                        <span
-                          className={`inline-flex rounded-full border px-3 py-1 text-[10px] font-medium uppercase tracking-[0.1em] ${
-                            statusStyles[contract.status]
-                          }`}
-                        >
-                          {contract.status.replace("_", " ")}
-                        </span>
-                      </td>
+                        <td className="px-6 py-5">
+                          <span
+                            className={`inline-flex rounded-full border px-3 py-1 text-[10px] font-medium uppercase tracking-[0.1em] ${
+                              statusStyles[
+                                contract.status
+                              ]
+                            }`}
+                          >
+                            {contract.status.replace(
+                              "_",
+                              " ",
+                            )}
+                          </span>
+                        </td>
 
-                      <td className="px-6 py-5 text-sm text-white/40">
-                        {formatDate(contract.createdAt)}
-                      </td>
+                        <td className="px-6 py-5 text-sm text-white/40">
+                          {formatDate(
+                            contract.createdAt,
+                          )}
+                        </td>
 
-                      <td className="px-6 py-5 text-sm text-white/40">
-                        {contract.expiresAt
-                          ? formatDate(contract.expiresAt)
-                          : "No expiry"}
-                      </td>
+                        <td className="px-6 py-5 text-sm text-white/40">
+                          {contract.expiresAt
+                            ? formatDate(
+                                contract.expiresAt,
+                              )
+                            : "No expiry"}
+                        </td>
 
-                      <td className="px-6 py-5 text-right">
-                        <button className="rounded-lg p-2 text-white/25 transition hover:bg-white/[0.05] hover:text-[#c5a34a]">
-                          <ChevronRight size={17} />
-                        </button>
-                      </td>
-                    </motion.tr>
-                  ))}
+                        <td className="px-6 py-5 text-right">
+                          <button
+                            type="button"
+                            className="rounded-lg p-2 text-white/25 transition hover:bg-white/[0.05] hover:text-[#c5a34a]"
+                          >
+                            <ChevronRight size={17} />
+                          </button>
+                        </td>
+                      </motion.tr>
+                    ),
+                  )}
                 </tbody>
               </table>
             </div>
           ) : (
             <div className="flex min-h-[420px] items-center justify-center p-8">
               <motion.div
-                initial={{ opacity: 0, scale: 0.96 }}
-                animate={{ opacity: 1, scale: 1 }}
+                initial={{
+                  opacity: 0,
+                  scale: 0.96,
+                }}
+                animate={{
+                  opacity: 1,
+                  scale: 1,
+                }}
                 className="max-w-sm text-center"
               >
                 <motion.div
-                  animate={{ y: [0, -5, 0] }}
+                  animate={{
+                    y: [0, -5, 0],
+                  }}
                   transition={{
                     duration: 4,
                     repeat: Infinity,
@@ -384,7 +504,9 @@ export default function ContractsPage() {
                 </motion.div>
 
                 <h2 className="mt-6 text-base font-semibold text-white/80">
-                  {search ? "No contracts found" : "No contracts yet"}
+                  {search
+                    ? "No contracts found"
+                    : "No contracts yet"}
                 </h2>
 
                 <p className="mt-2 text-sm leading-6 text-white/30">
@@ -395,12 +517,18 @@ export default function ContractsPage() {
 
                 {!search && (
                   <motion.button
-                    onClick={() => setShowModal(true)}
+                    type="button"
+                    onClick={() =>
+                      setShowModal(true)
+                    }
                     whileHover={{ y: -2 }}
-                    whileTap={{ scale: 0.98 }}
+                    whileTap={{
+                      scale: 0.98,
+                    }}
                     className="mt-6 inline-flex items-center gap-2 rounded-xl border border-[#c5a34a]/20 bg-[#c5a34a]/[0.07] px-4 py-2.5 text-xs font-medium text-[#d4b45c] transition hover:bg-[#c5a34a]/[0.12]"
                   >
                     Create your first contract
+
                     <ChevronRight size={14} />
                   </motion.button>
                 )}
@@ -418,16 +546,33 @@ export default function ContractsPage() {
             exit={{ opacity: 0 }}
             className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-md"
             onMouseDown={(event) => {
-              if (event.target === event.currentTarget) {
+              if (
+                event.target ===
+                event.currentTarget
+              ) {
                 setShowModal(false);
               }
             }}
           >
             <motion.div
-              initial={{ opacity: 0, scale: 0.96, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.96, y: 20 }}
-              transition={{ duration: 0.25 }}
+              initial={{
+                opacity: 0,
+                scale: 0.96,
+                y: 20,
+              }}
+              animate={{
+                opacity: 1,
+                scale: 1,
+                y: 0,
+              }}
+              exit={{
+                opacity: 0,
+                scale: 0.96,
+                y: 20,
+              }}
+              transition={{
+                duration: 0.25,
+              }}
               className="w-full max-w-xl overflow-hidden rounded-2xl border border-white/[0.08] bg-[#0b0b0b] shadow-2xl"
             >
               <div className="flex items-center justify-between border-b border-white/[0.06] p-6">
@@ -437,31 +582,44 @@ export default function ContractsPage() {
                   </h2>
 
                   <p className="mt-1 text-xs text-white/30">
-                    Create an agreement for an existing client.
+                    Create an agreement for an
+                    existing client.
                   </p>
                 </div>
 
                 <button
-                  onClick={() => setShowModal(false)}
-                  className="rounded-lg p-2 text-white/30 transition hover:bg-white/[0.05] hover:text-white"
+                  type="button"
+                  onClick={() =>
+                    setShowModal(false)
+                  }
+                  disabled={saving}
+                  className="rounded-lg p-2 text-white/30 transition hover:bg-white/[0.05] hover:text-white disabled:opacity-40"
                 >
                   <X size={18} />
                 </button>
               </div>
 
-              <form onSubmit={handleSubmit} className="p-6">
+              <form
+                onSubmit={handleSubmit}
+                className="p-6"
+              >
                 <div className="space-y-5">
                   <div>
                     <label className="mb-2 block text-xs font-medium text-white/45">
                       Contract title
-                      <span className="ml-1 text-[#c5a34a]">*</span>
+                      <span className="ml-1 text-[#c5a34a]">
+                        *
+                      </span>
                     </label>
 
                     <input
                       required
                       value={form.title}
                       onChange={(event) =>
-                        updateField("title", event.target.value)
+                        updateField(
+                          "title",
+                          event.target.value,
+                        )
                       }
                       placeholder="Service Agreement"
                       className="h-11 w-full rounded-xl border border-white/[0.07] bg-white/[0.025] px-4 text-sm text-white outline-none transition placeholder:text-white/20 focus:border-[#c5a34a]/40"
@@ -471,32 +629,46 @@ export default function ContractsPage() {
                   <div>
                     <label className="mb-2 block text-xs font-medium text-white/45">
                       Client
-                      <span className="ml-1 text-[#c5a34a]">*</span>
+                      <span className="ml-1 text-[#c5a34a]">
+                        *
+                      </span>
                     </label>
 
                     <select
                       required
                       value={form.clientId}
                       onChange={(event) =>
-                        updateField("clientId", event.target.value)
+                        updateField(
+                          "clientId",
+                          event.target.value,
+                        )
                       }
                       className="h-11 w-full rounded-xl border border-white/[0.07] bg-[#111] px-4 text-sm text-white outline-none transition focus:border-[#c5a34a]/40"
                     >
-                      <option value="">Select a client</option>
+                      <option value="">
+                        Select a client
+                      </option>
 
-                      {clients.map((client) => (
-                        <option key={client.id} value={client.id}>
-                          {client.user.name || client.user.email}
-                          {client.companyName
-                            ? ` — ${client.companyName}`
-                            : ""}
-                        </option>
-                      ))}
+                      {clients.map(
+                        (client) => (
+                          <option
+                            key={client.id}
+                            value={client.id}
+                          >
+                            {client.companyName ||
+                              client.name}
+                            {client.companyName
+                              ? ` — ${client.name}`
+                              : ` — ${client.email}`}
+                          </option>
+                        ),
+                      )}
                     </select>
 
                     {clients.length === 0 && (
                       <p className="mt-2 text-xs text-orange-300/70">
-                        You need to create a client before creating a
+                        You need to create a
+                        client before creating a
                         contract.
                       </p>
                     )}
@@ -511,15 +683,32 @@ export default function ContractsPage() {
                       <select
                         value={form.status}
                         onChange={(event) =>
-                          updateField("status", event.target.value)
+                          updateField(
+                            "status",
+                            event.target.value,
+                          )
                         }
                         className="h-11 w-full rounded-xl border border-white/[0.07] bg-[#111] px-4 text-sm text-white outline-none transition focus:border-[#c5a34a]/40"
                       >
-                        <option value="DRAFT">Draft</option>
-                        <option value="SENT">Sent</option>
-                        <option value="SIGNED">Signed</option>
-                        <option value="EXPIRED">Expired</option>
-                        <option value="CANCELLED">Cancelled</option>
+                        <option value="DRAFT">
+                          Draft
+                        </option>
+
+                        <option value="SENT">
+                          Sent
+                        </option>
+
+                        <option value="SIGNED">
+                          Signed
+                        </option>
+
+                        <option value="EXPIRED">
+                          Expired
+                        </option>
+
+                        <option value="CANCELLED">
+                          Cancelled
+                        </option>
                       </select>
                     </div>
 
@@ -536,11 +725,14 @@ export default function ContractsPage() {
 
                         <input
                           type="date"
-                          value={form.expiresAt}
+                          value={
+                            form.expiresAt
+                          }
                           onChange={(event) =>
                             updateField(
                               "expiresAt",
-                              event.target.value
+                              event.target
+                                .value,
                             )
                           }
                           className="h-11 w-full rounded-xl border border-white/[0.07] bg-white/[0.025] pl-10 pr-4 text-sm text-white outline-none transition focus:border-[#c5a34a]/40"
@@ -559,20 +751,30 @@ export default function ContractsPage() {
                 <div className="mt-7 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
                   <button
                     type="button"
-                    onClick={() => setShowModal(false)}
-                    className="rounded-xl border border-white/[0.08] px-5 py-3 text-sm text-white/50 transition hover:bg-white/[0.04] hover:text-white"
+                    onClick={() =>
+                      setShowModal(false)
+                    }
+                    disabled={saving}
+                    className="rounded-xl border border-white/[0.08] px-5 py-3 text-sm text-white/50 transition hover:bg-white/[0.04] hover:text-white disabled:opacity-50"
                   >
                     Cancel
                   </button>
 
                   <motion.button
                     whileHover={{ y: -1 }}
-                    whileTap={{ scale: 0.98 }}
-                    disabled={saving || clients.length === 0}
+                    whileTap={{
+                      scale: 0.98,
+                    }}
+                    disabled={
+                      saving ||
+                      clients.length === 0
+                    }
                     type="submit"
                     className="rounded-xl bg-[#c5a34a] px-6 py-3 text-sm font-semibold text-[#080808] transition hover:bg-[#d4b45c] disabled:cursor-not-allowed disabled:opacity-50"
                   >
-                    {saving ? "Creating..." : "Create Contract"}
+                    {saving
+                      ? "Creating..."
+                      : "Create Contract"}
                   </motion.button>
                 </div>
               </form>
@@ -585,9 +787,15 @@ export default function ContractsPage() {
 }
 
 function formatDate(date: string) {
+  const value = new Date(date);
+
+  if (Number.isNaN(value.getTime())) {
+    return "Unknown";
+  }
+
   return new Intl.DateTimeFormat("en-ZA", {
     day: "2-digit",
     month: "short",
     year: "numeric",
-  }).format(new Date(date));
+  }).format(value);
 }
