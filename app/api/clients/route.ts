@@ -4,16 +4,6 @@ import { prisma } from "@/lib/prisma";
 export async function GET() {
   try {
     const clients = await prisma.client.findMany({
-      include: {
-        user: {
-          select: {
-            name: true,
-            email: true,
-            phone: true,
-            isActive: true,
-          },
-        },
-      },
       orderBy: {
         createdAt: "desc",
       },
@@ -38,21 +28,19 @@ export async function POST(request: Request) {
   try {
     const body = await request.json();
 
-    const {
-      name,
-      email,
-      phone,
-      companyName,
-      address,
-      city,
-      province,
-      notes,
-    } = body;
+    const name = String(body.name ?? "").trim();
+    const email = String(body.email ?? "").trim().toLowerCase();
+    const phone = String(body.phone ?? "").trim();
+    const companyName = String(body.companyName ?? "").trim();
+    const address = String(body.address ?? "").trim();
+    const city = String(body.city ?? "").trim();
+    const province = String(body.province ?? "").trim();
+    const notes = String(body.notes ?? "").trim();
 
-    if (!name || !email) {
+    if (!name) {
       return NextResponse.json(
         {
-          error: "Name and email are required.",
+          error: "Client name is required.",
         },
         {
           status: 400,
@@ -60,18 +48,27 @@ export async function POST(request: Request) {
       );
     }
 
-    const normalizedEmail = String(email).trim().toLowerCase();
+    if (!email || !email.includes("@")) {
+      return NextResponse.json(
+        {
+          error: "A valid client email is required.",
+        },
+        {
+          status: 400,
+        },
+      );
+    }
 
-    const existingUser = await prisma.user.findUnique({
+    const existingClient = await prisma.client.findFirst({
       where: {
-        email: normalizedEmail,
+        email,
       },
     });
 
-    if (existingUser) {
+    if (existingClient) {
       return NextResponse.json(
         {
-          error: "A user with this email already exists.",
+          error: "A client with this email already exists.",
         },
         {
           status: 409,
@@ -79,43 +76,24 @@ export async function POST(request: Request) {
       );
     }
 
-    const client = await prisma.$transaction(async (tx) => {
-      const user = await tx.user.create({
-        data: {
-          name: String(name).trim(),
-          email: normalizedEmail,
-          phone: phone ? String(phone).trim() : null,
+    const client = await prisma.client.create({
+      data: {
+        name,
+        email,
+        phone: phone || null,
+        companyName: companyName || null,
+        address: address || null,
+        city: city || null,
+        province: province || null,
+        notes: notes || null,
+      },
+    });
 
-          // Temporary value for clients created by an administrator.
-          // Replace this with your real authentication/password flow later.
-          passwordHash: "",
-          role: "CLIENT",
-          isActive: true,
-        },
-      });
-
-      return tx.client.create({
-        data: {
-          userId: user.id,
-          companyName: companyName
-            ? String(companyName).trim()
-            : null,
-          address: address ? String(address).trim() : null,
-          city: city ? String(city).trim() : null,
-          province: province ? String(province).trim() : null,
-          notes: notes ? String(notes).trim() : null,
-        },
-        include: {
-          user: {
-            select: {
-              name: true,
-              email: true,
-              phone: true,
-              isActive: true,
-            },
-          },
-        },
-      });
+    await prisma.activityLog.create({
+      data: {
+        action: "CREATE",
+        description: `Created client ${client.name}`,
+      },
     });
 
     return NextResponse.json(client, {

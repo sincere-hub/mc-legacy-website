@@ -1,7 +1,10 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+
 import "./globals.css";
-import NavBar from "./components/NavBar";
+
+import AppShell from "./components/AppShell";
+import AuthProvider from "./components/AuthProvider";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -14,8 +17,12 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "MC Legacy",
-  description: "MC Legacy Company Portal",
+  title: {
+    default: "MC Legacy Media",
+    template: "%s | MC Legacy Media",
+  },
+  description:
+    "Professional photography, film and creative media services by MC Legacy Media.",
 };
 
 export default function RootLayout({
@@ -29,13 +36,9 @@ export default function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full bg-[#050505] text-white">
-        <NavBar />
-
-        <div className="min-h-screen lg:pl-[96px]">
-          <main className="min-h-screen pt-16 lg:pt-0">
-            {children}
-          </main>
-        </div>
+        <AuthProvider>
+          <AppShell>{children}</AppShell>
+        </AuthProvider>
       </body>
     </html>
   );

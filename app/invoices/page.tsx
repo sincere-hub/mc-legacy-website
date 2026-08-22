@@ -14,11 +14,12 @@ import { FormEvent, useEffect, useMemo, useState } from "react";
 
 type Client = {
   id: string;
+  name: string;
+  email: string;
+  phone: string | null;
   companyName: string | null;
-  user: {
-    name: string | null;
-    email: string;
-  };
+  city: string | null;
+  province: string | null;
 };
 
 type Invoice = {
@@ -39,13 +40,15 @@ type Invoice = {
     | "CANCELLED";
   dueDate: string | null;
   createdAt: string;
-  client: {
-    companyName: string | null;
-    user: {
-      name: string | null;
-      email: string;
-    };
-  };
+
+  client: Client;
+
+  booking?: {
+    id: string;
+    reference: string;
+    service: string;
+    status: string;
+  } | null;
 };
 
 type InvoiceForm = {
@@ -72,11 +75,9 @@ export default function InvoicesPage() {
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-
   const [modalOpen, setModalOpen] = useState(false);
 
   const [search, setSearch] = useState("");
-
   const [form, setForm] = useState<InvoiceForm>(emptyForm);
 
   const [error, setError] = useState("");
@@ -111,8 +112,13 @@ export default function InvoicesPage() {
         );
       }
 
-      setInvoices(invoiceData);
-      setClients(clientData);
+      setInvoices(
+        Array.isArray(invoiceData) ? invoiceData : [],
+      );
+
+      setClients(
+        Array.isArray(clientData) ? clientData : [],
+      );
     } catch (err) {
       console.error(err);
 
@@ -141,10 +147,14 @@ export default function InvoicesPage() {
       const text = [
         invoice.invoiceNumber,
         invoice.description,
+        invoice.client.name,
+        invoice.client.email,
+        invoice.client.phone,
         invoice.client.companyName,
-        invoice.client.user.name,
-        invoice.client.user.email,
+        invoice.client.city,
+        invoice.client.province,
         invoice.status,
+        invoice.booking?.reference,
       ]
         .filter(Boolean)
         .join(" ")
@@ -187,10 +197,9 @@ export default function InvoicesPage() {
   }
 
   function openModal() {
-    const nextNumber = `INV-${String(invoices.length + 1).padStart(
-      4,
-      "0",
-    )}`;
+    const nextNumber = `INV-${String(
+      invoices.length + 1,
+    ).padStart(4, "0")}`;
 
     setForm({
       ...emptyForm,
@@ -239,11 +248,16 @@ export default function InvoicesPage() {
         );
       }
 
-      setInvoices((current) => [data, ...current]);
+      setInvoices((current) => [
+        data,
+        ...current,
+      ]);
 
-      setSuccess("Invoice created successfully.");
+      setSuccess(
+        "Invoice created successfully.",
+      );
 
-      setTimeout(() => {
+      window.setTimeout(() => {
         setModalOpen(false);
         setForm(emptyForm);
         setSuccess("");
@@ -261,32 +275,24 @@ export default function InvoicesPage() {
     }
   }
 
-  const subtotalNumber = Number(form.subtotal) || 0;
-  const taxNumber = Number(form.tax) || 0;
-  const calculatedTotal = subtotalNumber + taxNumber;
+  const subtotalNumber =
+    Number(form.subtotal) || 0;
+
+  const taxNumber =
+    Number(form.tax) || 0;
+
+  const calculatedTotal =
+    subtotalNumber + taxNumber;
 
   return (
     <main className="min-h-screen overflow-hidden bg-[#050505] text-white">
-      {/* Ambient background */}
-      <div className="pointer-events-none fixed inset-0">
+      <div className="pointer-events-none fixed inset-0 -z-10">
         <div className="absolute -left-40 -top-40 h-[500px] w-[500px] rounded-full bg-[#b89235]/[0.06] blur-[140px]" />
 
         <div className="absolute -bottom-40 -right-40 h-[500px] w-[500px] rounded-full bg-[#8a6a22]/[0.05] blur-[140px]" />
-
-        <div
-          className="absolute inset-0 opacity-[0.025]"
-          style={{
-            backgroundImage: `
-              linear-gradient(rgba(255,255,255,0.5) 1px, transparent 1px),
-              linear-gradient(90deg, rgba(255,255,255,0.5) 1px, transparent 1px)
-            `,
-            backgroundSize: "80px 80px",
-          }}
-        />
       </div>
 
       <div className="relative mx-auto max-w-[1600px] px-5 py-8 sm:px-8 lg:px-10 lg:py-10">
-        {/* Header */}
         <div className="flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
           <div>
             <p className="mb-3 text-xs font-medium uppercase tracking-[0.2em] text-[#c5a34a]/70">
@@ -303,8 +309,9 @@ export default function InvoicesPage() {
           </div>
 
           <button
+            type="button"
             onClick={openModal}
-            className="flex items-center justify-center gap-2 rounded-xl bg-[#c5a34a] px-5 py-3 text-sm font-semibold text-black transition hover:bg-[#d4b45c] active:scale-[0.98]"
+            className="flex items-center justify-center gap-2 rounded-xl bg-[#c5a34a] px-5 py-3 text-sm font-semibold text-black transition hover:bg-[#d4b45c]"
           >
             <Plus size={17} />
 
@@ -312,7 +319,6 @@ export default function InvoicesPage() {
           </button>
         </div>
 
-        {/* Stats */}
         <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <StatCard
             title="Total Invoices"
@@ -328,7 +334,9 @@ export default function InvoicesPage() {
 
           <StatCard
             title="Outstanding"
-            value={formatCurrency(totalOutstanding)}
+            value={formatCurrency(
+              totalOutstanding,
+            )}
             icon={<FileText size={19} />}
           />
 
@@ -339,18 +347,19 @@ export default function InvoicesPage() {
           />
         </div>
 
-        {/* Invoice table */}
         <section className="mt-6 overflow-hidden rounded-2xl border border-white/[0.07] bg-[#0b0b0b]/90">
-          {/* Toolbar */}
           <div className="flex flex-col gap-4 border-b border-white/[0.06] p-5 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h2 className="text-sm font-semibold text-white">
+              <h2 className="text-sm font-semibold">
                 Invoice Management
               </h2>
 
               <p className="mt-1 text-xs text-white/30">
                 {filteredInvoices.length} invoice
-                {filteredInvoices.length === 1 ? "" : "s"} found
+                {filteredInvoices.length === 1
+                  ? ""
+                  : "s"}{" "}
+                found
               </p>
             </div>
 
@@ -363,10 +372,12 @@ export default function InvoicesPage() {
               <input
                 value={search}
                 onChange={(event) =>
-                  setSearch(event.target.value)
+                  setSearch(
+                    event.target.value,
+                  )
                 }
                 placeholder="Search invoices..."
-                className="w-full rounded-xl border border-white/[0.07] bg-white/[0.025] py-2.5 pl-10 pr-4 text-sm text-white outline-none placeholder:text-white/20 transition focus:border-[#c5a34a]/30"
+                className="w-full rounded-xl border border-white/[0.07] bg-white/[0.025] py-2.5 pl-10 pr-4 text-sm text-white outline-none placeholder:text-white/20 focus:border-[#c5a34a]/30"
               />
             </div>
           </div>
@@ -387,19 +398,19 @@ export default function InvoicesPage() {
                 </p>
               </div>
             </div>
-          ) : filteredInvoices.length === 0 ? (
+          ) : filteredInvoices.length ===
+            0 ? (
             <div className="flex min-h-[360px] items-center justify-center p-8">
               <div className="max-w-sm text-center">
-                <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl border border-white/[0.07] bg-white/[0.025]">
-                  <Receipt
-                    size={25}
-                    strokeWidth={1.5}
-                    className="text-white/25"
-                  />
-                </div>
+                <Receipt
+                  size={28}
+                  className="mx-auto text-white/20"
+                />
 
                 <h3 className="mt-5 text-sm font-medium text-white/70">
-                  {search ? "No invoices found" : "No invoices yet"}
+                  {search
+                    ? "No invoices found"
+                    : "No invoices yet"}
                 </h3>
 
                 <p className="mt-2 text-xs leading-5 text-white/25">
@@ -407,162 +418,188 @@ export default function InvoicesPage() {
                     ? "Try a different invoice number or client."
                     : "Create your first invoice to start tracking client payments."}
                 </p>
-
-                {!search && (
-                  <button
-                    onClick={openModal}
-                    className="mt-6 inline-flex items-center gap-2 rounded-xl bg-[#c5a34a] px-5 py-2.5 text-xs font-semibold text-black transition hover:bg-[#d4b45c]"
-                  >
-                    <Plus size={15} />
-                    Create First Invoice
-                  </button>
-                )}
               </div>
             </div>
           ) : (
             <>
-              {/* Desktop */}
               <div className="hidden overflow-x-auto lg:block">
                 <table className="w-full text-left">
                   <thead className="border-b border-white/[0.06] bg-white/[0.015]">
                     <tr>
-                      <th className="px-6 py-4 text-[10px] font-medium uppercase tracking-[0.16em] text-white/25">
+                      <TableHeading>
                         Invoice
-                      </th>
+                      </TableHeading>
 
-                      <th className="px-6 py-4 text-[10px] font-medium uppercase tracking-[0.16em] text-white/25">
+                      <TableHeading>
                         Client
-                      </th>
+                      </TableHeading>
 
-                      <th className="px-6 py-4 text-[10px] font-medium uppercase tracking-[0.16em] text-white/25">
+                      <TableHeading>
                         Amount
-                      </th>
+                      </TableHeading>
 
-                      <th className="px-6 py-4 text-[10px] font-medium uppercase tracking-[0.16em] text-white/25">
+                      <TableHeading>
                         Due
-                      </th>
+                      </TableHeading>
 
-                      <th className="px-6 py-4 text-[10px] font-medium uppercase tracking-[0.16em] text-white/25">
+                      <TableHeading>
                         Status
-                      </th>
+                      </TableHeading>
                     </tr>
                   </thead>
 
                   <tbody>
-                    {filteredInvoices.map((invoice) => (
-                      <tr
-                        key={invoice.id}
-                        className="border-b border-white/[0.04] transition hover:bg-white/[0.02]"
-                      >
-                        <td className="px-6 py-5">
-                          <p className="text-sm font-medium text-white/75">
-                            {invoice.invoiceNumber}
-                          </p>
-
-                          <p className="mt-1 max-w-[240px] truncate text-xs text-white/25">
-                            {invoice.description ||
-                              "No description"}
-                          </p>
-                        </td>
-
-                        <td className="px-6 py-5">
-                          <p className="text-sm text-white/60">
-                            {invoice.client.companyName ||
-                              invoice.client.user.name ||
-                              "Client"}
-                          </p>
-
-                          <p className="mt-1 text-xs text-white/25">
-                            {invoice.client.user.email}
-                          </p>
-                        </td>
-
-                        <td className="px-6 py-5">
-                          <p className="text-sm font-medium text-white/70">
-                            {formatCurrency(
-                              Number(invoice.total),
-                            )}
-                          </p>
-
-                          {Number(invoice.amountPaid) > 0 && (
-                            <p className="mt-1 text-xs text-green-400/70">
-                              {formatCurrency(
-                                Number(invoice.amountPaid),
-                              )} paid
+                    {filteredInvoices.map(
+                      (invoice) => (
+                        <tr
+                          key={invoice.id}
+                          className="border-b border-white/[0.04] transition hover:bg-white/[0.02]"
+                        >
+                          <td className="px-6 py-5">
+                            <p className="text-sm font-medium text-white/75">
+                              {
+                                invoice.invoiceNumber
+                              }
                             </p>
-                          )}
-                        </td>
 
-                        <td className="px-6 py-5">
-                          <p className="text-xs text-white/40">
-                            {formatDate(invoice.dueDate)}
-                          </p>
-                        </td>
+                            <p className="mt-1 max-w-[240px] truncate text-xs text-white/25">
+                              {invoice.description ||
+                                "No description"}
+                            </p>
+                          </td>
 
-                        <td className="px-6 py-5">
-                          <StatusBadge status={invoice.status} />
-                        </td>
-                      </tr>
-                    ))}
+                          <td className="px-6 py-5">
+                            <p className="text-sm text-white/60">
+                              {invoice.client
+                                .companyName ||
+                                invoice.client
+                                  .name}
+                            </p>
+
+                            <p className="mt-1 text-xs text-white/25">
+                              {
+                                invoice.client
+                                  .email
+                              }
+                            </p>
+                          </td>
+
+                          <td className="px-6 py-5">
+                            <p className="text-sm font-medium text-white/70">
+                              {formatCurrency(
+                                Number(
+                                  invoice.total,
+                                ),
+                              )}
+                            </p>
+
+                            {Number(
+                              invoice.amountPaid,
+                            ) > 0 && (
+                              <p className="mt-1 text-xs text-green-400/70">
+                                {formatCurrency(
+                                  Number(
+                                    invoice.amountPaid,
+                                  ),
+                                )}{" "}
+                                paid
+                              </p>
+                            )}
+                          </td>
+
+                          <td className="px-6 py-5 text-xs text-white/40">
+                            {formatDate(
+                              invoice.dueDate,
+                            )}
+                          </td>
+
+                          <td className="px-6 py-5">
+                            <StatusBadge
+                              status={
+                                invoice.status
+                              }
+                            />
+                          </td>
+                        </tr>
+                      ),
+                    )}
                   </tbody>
                 </table>
               </div>
 
-              {/* Mobile */}
               <div className="grid gap-3 p-4 lg:hidden">
-                {filteredInvoices.map((invoice) => (
-                  <div
-                    key={invoice.id}
-                    className="rounded-xl border border-white/[0.06] bg-white/[0.015] p-4"
-                  >
-                    <div className="flex items-start justify-between gap-4">
-                      <div>
-                        <p className="text-sm font-medium text-white/80">
-                          {invoice.invoiceNumber}
-                        </p>
+                {filteredInvoices.map(
+                  (invoice) => (
+                    <div
+                      key={invoice.id}
+                      className="rounded-xl border border-white/[0.06] bg-white/[0.015] p-4"
+                    >
+                      <div className="flex items-start justify-between gap-4">
+                        <div>
+                          <p className="text-sm font-medium text-white/80">
+                            {
+                              invoice.invoiceNumber
+                            }
+                          </p>
 
-                        <p className="mt-1 text-xs text-white/30">
-                          {invoice.client.companyName ||
-                            invoice.client.user.name ||
-                            "Client"}
-                        </p>
+                          <p className="mt-1 text-xs text-white/30">
+                            {invoice.client
+                              .companyName ||
+                              invoice.client
+                                .name}
+                          </p>
+
+                          <p className="mt-1 text-[11px] text-white/20">
+                            {
+                              invoice.client
+                                .email
+                            }
+                          </p>
+                        </div>
+
+                        <StatusBadge
+                          status={
+                            invoice.status
+                          }
+                        />
                       </div>
 
-                      <StatusBadge status={invoice.status} />
+                      <div className="mt-5 grid grid-cols-2 gap-4">
+                        <div>
+                          <p className="text-[10px] uppercase tracking-[0.12em] text-white/20">
+                            Total
+                          </p>
+
+                          <p className="mt-1 text-sm font-medium text-white/70">
+                            {formatCurrency(
+                              Number(
+                                invoice.total,
+                              ),
+                            )}
+                          </p>
+                        </div>
+
+                        <div>
+                          <p className="text-[10px] uppercase tracking-[0.12em] text-white/20">
+                            Due
+                          </p>
+
+                          <p className="mt-1 text-sm text-white/50">
+                            {formatDate(
+                              invoice.dueDate,
+                            )}
+                          </p>
+                        </div>
+                      </div>
                     </div>
-
-                    <div className="mt-5 grid grid-cols-2 gap-4">
-                      <div>
-                        <p className="text-[10px] uppercase tracking-[0.12em] text-white/20">
-                          Total
-                        </p>
-
-                        <p className="mt-1 text-sm font-medium text-white/70">
-                          {formatCurrency(
-                            Number(invoice.total),
-                          )}
-                        </p>
-                      </div>
-
-                      <div>
-                        <p className="text-[10px] uppercase tracking-[0.12em] text-white/20">
-                          Due
-                        </p>
-
-                        <p className="mt-1 text-sm text-white/50">
-                          {formatDate(invoice.dueDate)}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                ))}
+                  ),
+                )}
               </div>
             </>
           )}
         </section>
       </div>
 
-      {/* Create Invoice Modal */}
       {modalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/75 p-4 backdrop-blur-md">
           <div className="my-8 w-full max-w-2xl overflow-hidden rounded-2xl border border-white/[0.08] bg-[#0b0b0b] shadow-2xl">
@@ -578,9 +615,10 @@ export default function InvoicesPage() {
               </div>
 
               <button
+                type="button"
                 onClick={closeModal}
                 disabled={saving}
-                className="rounded-xl p-2 text-white/30 transition hover:bg-white/[0.05] hover:text-white"
+                className="rounded-xl p-2 text-white/30 hover:bg-white/[0.05] hover:text-white disabled:opacity-40"
               >
                 <X size={18} />
               </button>
@@ -607,8 +645,8 @@ export default function InvoicesPage() {
                     </p>
 
                     <p className="mt-2 text-xs leading-5 text-white/35">
-                      You need to create a client before creating
-                      an invoice.
+                      You need to create a client
+                      before creating an invoice.
                     </p>
                   </div>
                 ) : (
@@ -625,33 +663,43 @@ export default function InvoicesPage() {
                         <div className="relative">
                           <select
                             required
-                            value={form.clientId}
-                            onChange={(event) =>
+                            value={
+                              form.clientId
+                            }
+                            onChange={(
+                              event,
+                            ) =>
                               updateField(
                                 "clientId",
-                                event.target.value,
+                                event.target
+                                  .value,
                               )
                             }
-                            className="w-full appearance-none rounded-xl border border-white/[0.08] bg-white/[0.025] px-4 py-3 pr-10 text-sm text-white outline-none transition focus:border-[#c5a34a]/30"
+                            className="w-full appearance-none rounded-xl border border-white/[0.08] bg-[#111] px-4 py-3 pr-10 text-sm text-white outline-none focus:border-[#c5a34a]/30"
                           >
-                            <option
-                              value=""
-                              className="bg-[#0b0b0b]"
-                            >
+                            <option value="">
                               Select a client
                             </option>
 
-                            {clients.map((client) => (
-                              <option
-                                key={client.id}
-                                value={client.id}
-                                className="bg-[#0b0b0b]"
-                              >
-                                {client.companyName ||
-                                  client.user.name ||
-                                  client.user.email}
-                              </option>
-                            ))}
+                            {clients.map(
+                              (client) => (
+                                <option
+                                  key={
+                                    client.id
+                                  }
+                                  value={
+                                    client.id
+                                  }
+                                >
+                                  {client.companyName ||
+                                    client.name}{" "}
+                                  —{" "}
+                                  {
+                                    client.email
+                                  }
+                                </option>
+                              ),
+                            )}
                           </select>
 
                           <ChevronDown
@@ -665,9 +713,14 @@ export default function InvoicesPage() {
                     <FormField
                       label="Invoice Number"
                       required
-                      value={form.invoiceNumber}
+                      value={
+                        form.invoiceNumber
+                      }
                       onChange={(value) =>
-                        updateField("invoiceNumber", value)
+                        updateField(
+                          "invoiceNumber",
+                          value,
+                        )
                       }
                       placeholder="INV-0001"
                     />
@@ -675,18 +728,28 @@ export default function InvoicesPage() {
                     <FormField
                       label="Due Date"
                       type="date"
-                      value={form.dueDate}
+                      value={
+                        form.dueDate
+                      }
                       onChange={(value) =>
-                        updateField("dueDate", value)
+                        updateField(
+                          "dueDate",
+                          value,
+                        )
                       }
                     />
 
                     <div className="sm:col-span-2">
                       <FormField
                         label="Description"
-                        value={form.description}
+                        value={
+                          form.description
+                        }
                         onChange={(value) =>
-                          updateField("description", value)
+                          updateField(
+                            "description",
+                            value,
+                          )
                         }
                         placeholder="Photography services..."
                       />
@@ -696,9 +759,14 @@ export default function InvoicesPage() {
                       label="Subtotal"
                       required
                       type="number"
-                      value={form.subtotal}
+                      value={
+                        form.subtotal
+                      }
                       onChange={(value) =>
-                        updateField("subtotal", value)
+                        updateField(
+                          "subtotal",
+                          value,
+                        )
                       }
                       placeholder="0.00"
                     />
@@ -708,7 +776,10 @@ export default function InvoicesPage() {
                       type="number"
                       value={form.tax}
                       onChange={(value) =>
-                        updateField("tax", value)
+                        updateField(
+                          "tax",
+                          value,
+                        )
                       }
                       placeholder="0.00"
                     />
@@ -720,13 +791,17 @@ export default function InvoicesPage() {
                             Invoice Total
                           </p>
 
-                          <p className="mt-2 text-2xl font-semibold text-white">
-                            {formatCurrency(calculatedTotal)}
+                          <p className="mt-2 text-2xl font-semibold">
+                            {formatCurrency(
+                              calculatedTotal,
+                            )}
                           </p>
                         </div>
 
                         <div className="rounded-xl border border-[#c5a34a]/15 bg-[#c5a34a]/10 p-3 text-[#c5a34a]">
-                          <Receipt size={20} />
+                          <Receipt
+                            size={20}
+                          />
                         </div>
                       </div>
                     </div>
@@ -739,17 +814,22 @@ export default function InvoicesPage() {
                   type="button"
                   onClick={closeModal}
                   disabled={saving}
-                  className="rounded-xl border border-white/[0.08] px-5 py-3 text-sm font-medium text-white/50 transition hover:bg-white/[0.04] hover:text-white"
+                  className="rounded-xl border border-white/[0.08] px-5 py-3 text-sm text-white/50"
                 >
                   Cancel
                 </button>
 
                 <button
                   type="submit"
-                  disabled={saving || clients.length === 0}
-                  className="rounded-xl bg-[#c5a34a] px-6 py-3 text-sm font-semibold text-black transition hover:bg-[#d4b45c] disabled:cursor-not-allowed disabled:opacity-50"
+                  disabled={
+                    saving ||
+                    clients.length === 0
+                  }
+                  className="rounded-xl bg-[#c5a34a] px-6 py-3 text-sm font-semibold text-black disabled:opacity-50"
                 >
-                  {saving ? "Creating..." : "Create Invoice"}
+                  {saving
+                    ? "Creating..."
+                    : "Create Invoice"}
                 </button>
               </div>
             </form>
@@ -757,6 +837,18 @@ export default function InvoicesPage() {
         </div>
       )}
     </main>
+  );
+}
+
+function TableHeading({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <th className="px-6 py-4 text-[10px] font-medium uppercase tracking-[0.16em] text-white/25">
+      {children}
+    </th>
   );
 }
 
@@ -811,19 +903,31 @@ function FormField({
         {label}
 
         {required && (
-          <span className="ml-1 text-[#c5a34a]">*</span>
+          <span className="ml-1 text-[#c5a34a]">
+            *
+          </span>
         )}
       </span>
 
       <input
         type={type}
         required={required}
-        min={type === "number" ? "0" : undefined}
-        step={type === "number" ? "0.01" : undefined}
+        min={
+          type === "number"
+            ? "0"
+            : undefined
+        }
+        step={
+          type === "number"
+            ? "0.01"
+            : undefined
+        }
         value={value}
-        onChange={(event) => onChange(event.target.value)}
+        onChange={(event) =>
+          onChange(event.target.value)
+        }
         placeholder={placeholder}
-        className="w-full rounded-xl border border-white/[0.08] bg-white/[0.025] px-4 py-3 text-sm text-white outline-none placeholder:text-white/20 transition focus:border-[#c5a34a]/30 focus:bg-white/[0.035]"
+        className="w-full rounded-xl border border-white/[0.08] bg-white/[0.025] px-4 py-3 text-sm text-white outline-none placeholder:text-white/20 focus:border-[#c5a34a]/30"
       />
     </label>
   );
@@ -858,7 +962,8 @@ function StatusBadge({
   > = {
     DRAFT: "Draft",
     SENT: "Sent",
-    PARTIALLY_PAID: "Partially Paid",
+    PARTIALLY_PAID:
+      "Partially Paid",
     PAID: "Paid",
     OVERDUE: "Overdue",
     CANCELLED: "Cancelled",
@@ -874,27 +979,37 @@ function StatusBadge({
 }
 
 function formatCurrency(value: number) {
-  return new Intl.NumberFormat("en-ZA", {
-    style: "currency",
-    currency: "ZAR",
-    minimumFractionDigits: 2,
-  }).format(value);
+  return new Intl.NumberFormat(
+    "en-ZA",
+    {
+      style: "currency",
+      currency: "ZAR",
+      minimumFractionDigits: 2,
+    },
+  ).format(value);
 }
 
-function formatDate(value: string | null) {
+function formatDate(
+  value: string | null,
+) {
   if (!value) {
     return "Not set";
   }
 
   const date = new Date(value);
 
-  if (Number.isNaN(date.getTime())) {
+  if (
+    Number.isNaN(date.getTime())
+  ) {
     return "Not set";
   }
 
-  return new Intl.DateTimeFormat("en-ZA", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  }).format(date);
+  return new Intl.DateTimeFormat(
+    "en-ZA",
+    {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    },
+  ).format(date);
 }

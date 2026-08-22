@@ -1,202 +1,371 @@
 "use client";
 
-import { FormEvent, useState } from "react";
-import { signIn } from "next-auth/react";
+import {
+  ArrowLeft,
+  ArrowRight,
+  Eye,
+  EyeOff,
+  Loader2,
+  LockKeyhole,
+  Mail,
+  ShieldCheck,
+  UserRound,
+} from "lucide-react";
+import Image from "next/image";
+import Link from "next/link";
+import { signIn, useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import { AnimatePresence, motion } from "framer-motion";
-import ThreeDBackground from "@/components/ui/ThreeDBackground";
+import {
+  FormEvent,
+  useEffect,
+  useState,
+} from "react";
+
+type LoginRole = "ADMIN" | "STAFF";
 
 export default function LoginPage() {
   const router = useRouter();
+  const { status } = useSession();
 
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [role, setRole] =
+    useState<LoginRole>("ADMIN");
 
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  const [email, setEmail] =
+    useState("");
+
+  const [password, setPassword] =
+    useState("");
+
+  const [showPassword, setShowPassword] =
+    useState(false);
+
+  const [loading, setLoading] =
+    useState(false);
+
+  const [error, setError] =
+    useState("");
+
+  useEffect(() => {
+    if (status === "authenticated") {
+      router.replace("/dashboard");
+    }
+  }, [status, router]);
+
+  async function handleSubmit(
+    event: FormEvent<HTMLFormElement>,
+  ) {
     event.preventDefault();
 
-    setError("");
-    setLoading(true);
+    try {
+      setLoading(true);
+      setError("");
 
-    const result = await signIn("credentials", {
-      email,
-      password,
-      redirect: false,
-    });
+   const result = await signIn(
+  "credentials",
+  {
+    email: email
+      .trim()
+      .toLowerCase(),
 
-    if (result?.error) {
-      setError("Invalid email or password.");
+    password,
+
+    portalRole: role,
+
+    redirect: false,
+  },
+);
+      if (!result) {
+        throw new Error(
+          "Unable to complete sign in.",
+        );
+      }
+
+      if (result.error) {
+        throw new Error(
+          "Invalid email or password.",
+        );
+      }
+
+      router.replace("/dashboard");
+      router.refresh();
+    } catch (error) {
+      setError(
+        error instanceof Error
+          ? error.message
+          : "Unable to sign in.",
+      );
+    } finally {
       setLoading(false);
-      return;
     }
+  }
 
-    router.push("/dashboard");
-    router.refresh();
+  if (status === "loading") {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-[#050505] text-white">
+        <Loader2
+          size={28}
+          className="animate-spin text-[#c5a34a]"
+        />
+      </main>
+    );
   }
 
   return (
-    <ThreeDBackground>
-      <main className="flex min-h-screen items-center justify-center px-6 py-12">
-        <motion.div
-          initial={{ opacity: 0, y: 30, rotateX: 8 }}
-          animate={{ opacity: 1, y: 0, rotateX: 0 }}
-          transition={{
-            duration: 0.8,
-            ease: [0.22, 1, 0.36, 1],
+    <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[#050505] px-5 py-12 text-white">
+      {/* Background */}
+      <div className="pointer-events-none absolute inset-0">
+        <div className="absolute -left-40 -top-40 h-[500px] w-[500px] rounded-full bg-[#c5a34a]/[0.08] blur-[150px]" />
+
+        <div className="absolute -bottom-40 -right-40 h-[500px] w-[500px] rounded-full bg-[#8a6a22]/[0.06] blur-[150px]" />
+
+        <div
+          className="absolute inset-0 opacity-[0.025]"
+          style={{
+            backgroundImage: `
+              linear-gradient(rgba(255,255,255,0.5) 1px, transparent 1px),
+              linear-gradient(90deg, rgba(255,255,255,0.5) 1px, transparent 1px)
+            `,
+            backgroundSize:
+              "80px 80px",
           }}
-          className="w-full max-w-[440px]"
-          style={{ perspective: 1200 }}
-        >
-          <div className="relative overflow-hidden rounded-[28px] border border-white/[0.09] bg-[#0d0d0d]/90 p-8 shadow-[0_30px_100px_rgba(0,0,0,0.55)] backdrop-blur-2xl sm:p-10">
-            {/* Gold accent */}
-            <div className="absolute left-0 right-0 top-0 h-px bg-gradient-to-r from-transparent via-[#c5a34a] to-transparent" />
+        />
+      </div>
 
-            {/* Brand */}
-            <motion.div
-              initial={{ opacity: 0, y: -15 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.15, duration: 0.5 }}
-            >
-              <div className="mb-8">
-                <div className="mb-6 flex items-center gap-3">
-                  <div className="flex h-11 w-11 items-center justify-center rounded-xl border border-[#c5a34a]/30 bg-[#c5a34a]/10">
-                    <span className="text-sm font-bold tracking-tight text-[#d4b45c]">
-                      MC
-                    </span>
-                  </div>
+      {/* Back button */}
+      <Link
+        href="/"
+        className="absolute left-5 top-5 z-20 inline-flex items-center gap-2 rounded-xl border border-white/[0.08] bg-black/30 px-4 py-2.5 text-xs text-white/45 backdrop-blur-md transition hover:border-[#c5a34a]/20 hover:bg-white/[0.04] hover:text-white"
+      >
+        <ArrowLeft size={15} />
 
-                  <div>
-                    <p className="text-sm font-semibold tracking-[0.18em] text-white">
-                      MC LEGACY
-                    </p>
-                    <p className="mt-0.5 text-[10px] uppercase tracking-[0.2em] text-white/35">
-                      Member Portal
-                    </p>
-                  </div>
-                </div>
+        Back to website
+      </Link>
 
-                <h1 className="text-3xl font-semibold tracking-[-0.03em] text-white">
+      <div className="relative w-full max-w-md">
+        {/* Logo */}
+        <div className="mb-8 text-center">
+          <div className="relative mx-auto h-28 w-56">
+            <Image
+              src="/images/mc-legacy-logo.png"
+              alt="MC Legacy Media"
+              fill
+              priority
+              sizes="224px"
+              className="object-contain"
+            />
+          </div>
+
+          <p className="mt-4 text-[10px] font-medium uppercase tracking-[0.24em] text-[#c5a34a]/70">
+            Company Portal
+          </p>
+        </div>
+
+        {/* Login card */}
+        <div className="overflow-hidden rounded-[1.75rem] border border-white/[0.08] bg-[#0b0b0b]/95 shadow-2xl backdrop-blur-xl">
+          <div className="border-b border-white/[0.06] px-7 py-6">
+            <div className="flex items-center gap-3">
+              <div className="rounded-xl border border-[#c5a34a]/15 bg-[#c5a34a]/[0.06] p-2.5 text-[#c5a34a]">
+                <ShieldCheck
+                  size={19}
+                />
+              </div>
+
+              <div>
+                <h1 className="text-lg font-semibold tracking-[-0.02em]">
                   Welcome back
                 </h1>
 
-                <p className="mt-2 text-sm leading-6 text-white/40">
-                  Sign in to securely access your MC Legacy account.
+                <p className="mt-1 text-xs text-white/30">
+                  Sign in to the MC Legacy
+                  management portal.
                 </p>
               </div>
-            </motion.div>
-
-            {/* Form */}
-            <motion.form
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 0.25, duration: 0.5 }}
-              onSubmit={handleSubmit}
-              className="space-y-5"
-            >
-              <div>
-                <label
-                  htmlFor="email"
-                  className="mb-2 block text-xs font-medium uppercase tracking-[0.12em] text-white/45"
-                >
-                  Email address
-                </label>
-
-                <input
-                  id="email"
-                  type="email"
-                  value={email}
-                  onChange={(event) => setEmail(event.target.value)}
-                  placeholder="name@mclegacy.co.za"
-                  required
-                  className="h-12 w-full rounded-xl border border-white/[0.09] bg-white/[0.035] px-4 text-sm text-white outline-none transition-all duration-300 placeholder:text-white/20 hover:border-white/[0.15] focus:border-[#c5a34a]/50 focus:bg-white/[0.05] focus:ring-4 focus:ring-[#c5a34a]/[0.07]"
-                />
-              </div>
-
-              <div>
-                <label
-                  htmlFor="password"
-                  className="mb-2 block text-xs font-medium uppercase tracking-[0.12em] text-white/45"
-                >
-                  Password
-                </label>
-
-                <input
-                  id="password"
-                  type="password"
-                  value={password}
-                  onChange={(event) => setPassword(event.target.value)}
-                  placeholder="Enter your password"
-                  required
-                  className="h-12 w-full rounded-xl border border-white/[0.09] bg-white/[0.035] px-4 text-sm text-white outline-none transition-all duration-300 placeholder:text-white/20 hover:border-white/[0.15] focus:border-[#c5a34a]/50 focus:bg-white/[0.05] focus:ring-4 focus:ring-[#c5a34a]/[0.07]"
-                />
-              </div>
-
-              <AnimatePresence>
-                {error && (
-                  <motion.div
-                    initial={{ opacity: 0, height: 0, y: -8 }}
-                    animate={{ opacity: 1, height: "auto", y: 0 }}
-                    exit={{ opacity: 0, height: 0, y: -8 }}
-                    className="overflow-hidden"
-                  >
-                    <div className="rounded-xl border border-red-500/20 bg-red-500/[0.07] px-4 py-3 text-sm text-red-300">
-                      {error}
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-
-              <motion.button
-                type="submit"
-                disabled={loading}
-                whileHover={{ y: -1 }}
-                whileTap={{ scale: 0.985 }}
-                className="relative h-12 w-full overflow-hidden rounded-xl bg-[#c5a34a] text-sm font-semibold text-[#090909] transition-all duration-300 hover:bg-[#d4b45c] hover:shadow-[0_10px_30px_rgba(197,163,74,0.15)] disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                <AnimatePresence mode="wait">
-                  {loading ? (
-                    <motion.span
-                      key="loading"
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      exit={{ opacity: 0 }}
-                    >
-                      Signing in...
-                    </motion.span>
-                  ) : (
-                    <motion.span
-                      key="login"
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      exit={{ opacity: 0 }}
-                    >
-                      Sign in
-                    </motion.span>
-                  )}
-                </AnimatePresence>
-              </motion.button>
-            </motion.form>
-
-            {/* Footer */}
-            <div className="mt-8 border-t border-white/[0.06] pt-5">
-              <p className="text-center text-[11px] tracking-wide text-white/25">
-                Secure member access
-              </p>
             </div>
           </div>
 
-          <motion.p
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.8 }}
-            className="mt-5 text-center text-[10px] uppercase tracking-[0.2em] text-white/20"
+          <form
+            onSubmit={handleSubmit}
+            className="p-7"
           >
-            MC Legacy
-          </motion.p>
-        </motion.div>
-      </main>
-    </ThreeDBackground>
+            {/* Role selector */}
+            <div>
+              <label className="mb-2 block text-xs font-medium text-white/45">
+                Sign in as
+              </label>
+
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  onClick={() =>
+                    setRole("ADMIN")
+                  }
+                  className={`flex items-center justify-center gap-2 rounded-xl border px-4 py-3 text-xs font-medium transition ${
+                    role === "ADMIN"
+                      ? "border-[#c5a34a]/30 bg-[#c5a34a]/[0.08] text-[#d4b45c]"
+                      : "border-white/[0.07] bg-white/[0.02] text-white/35 hover:bg-white/[0.04] hover:text-white/60"
+                  }`}
+                >
+                  <ShieldCheck
+                    size={15}
+                  />
+
+                  Administrator
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() =>
+                    setRole("STAFF")
+                  }
+                  className={`flex items-center justify-center gap-2 rounded-xl border px-4 py-3 text-xs font-medium transition ${
+                    role === "STAFF"
+                      ? "border-[#c5a34a]/30 bg-[#c5a34a]/[0.08] text-[#d4b45c]"
+                      : "border-white/[0.07] bg-white/[0.02] text-white/35 hover:bg-white/[0.04] hover:text-white/60"
+                  }`}
+                >
+                  <UserRound size={15} />
+
+                  Staff
+                </button>
+              </div>
+            </div>
+
+            {error && (
+              <div className="mt-5 rounded-xl border border-red-500/20 bg-red-500/[0.06] px-4 py-3 text-sm text-red-300">
+                {error}
+              </div>
+            )}
+
+            {/* Email */}
+            <div className="mt-5">
+              <label className="mb-2 block text-xs font-medium text-white/45">
+                Email address
+              </label>
+
+              <div className="relative">
+                <Mail
+                  size={16}
+                  className="absolute left-4 top-1/2 -translate-y-1/2 text-white/20"
+                />
+
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(event) =>
+                    setEmail(
+                      event.target.value,
+                    )
+                  }
+                  required
+                  autoComplete="email"
+                  placeholder={
+                    role === "ADMIN"
+                      ? "admin@mclegacy.co.za"
+                      : "staff@mclegacy.co.za"
+                  }
+                  className="w-full rounded-xl border border-white/[0.08] bg-white/[0.025] py-3.5 pl-11 pr-4 text-sm text-white outline-none transition placeholder:text-white/15 focus:border-[#c5a34a]/40 focus:bg-white/[0.035]"
+                />
+              </div>
+            </div>
+
+            {/* Password */}
+            <div className="mt-5">
+              <label className="mb-2 block text-xs font-medium text-white/45">
+                Password
+              </label>
+
+              <div className="relative">
+                <LockKeyhole
+                  size={16}
+                  className="absolute left-4 top-1/2 -translate-y-1/2 text-white/20"
+                />
+
+                <input
+                  type={
+                    showPassword
+                      ? "text"
+                      : "password"
+                  }
+                  value={password}
+                  onChange={(event) =>
+                    setPassword(
+                      event.target.value,
+                    )
+                  }
+                  required
+                  autoComplete="current-password"
+                  placeholder="Enter your password"
+                  className="w-full rounded-xl border border-white/[0.08] bg-white/[0.025] py-3.5 pl-11 pr-12 text-sm text-white outline-none transition placeholder:text-white/15 focus:border-[#c5a34a]/40 focus:bg-white/[0.035]"
+                />
+
+                <button
+                  type="button"
+                  onClick={() =>
+                    setShowPassword(
+                      (current) =>
+                        !current,
+                    )
+                  }
+                  aria-label={
+                    showPassword
+                      ? "Hide password"
+                      : "Show password"
+                  }
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-white/25 transition hover:text-white/60"
+                >
+                  {showPassword ? (
+                    <EyeOff
+                      size={17}
+                    />
+                  ) : (
+                    <Eye size={17} />
+                  )}
+                </button>
+              </div>
+            </div>
+
+            {/* Sign in */}
+            <button
+              type="submit"
+              disabled={loading}
+              className="mt-7 flex w-full items-center justify-center gap-2 rounded-xl bg-[#c5a34a] px-5 py-3.5 text-sm font-semibold text-black transition hover:bg-[#d4b45c] disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {loading ? (
+                <>
+                  <Loader2
+                    size={17}
+                    className="animate-spin"
+                  />
+
+                  Signing in...
+                </>
+              ) : (
+                <>
+                  Sign in as{" "}
+                  {role === "ADMIN"
+                    ? "Administrator"
+                    : "Staff"}
+
+                  <ArrowRight
+                    size={17}
+                  />
+                </>
+              )}
+            </button>
+
+            <p className="mt-6 text-center text-[11px] leading-5 text-white/20">
+              Access is restricted to
+              authorised MC Legacy Media
+              administrators and staff
+              members.
+            </p>
+          </form>
+        </div>
+
+        <p className="mt-6 text-center text-[10px] uppercase tracking-[0.14em] text-white/15">
+          MC Legacy Media · Secure Portal
+        </p>
+      </div>
+    </main>
   );
 }

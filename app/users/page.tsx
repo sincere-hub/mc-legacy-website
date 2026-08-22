@@ -7,12 +7,19 @@ import {
   Plus,
   Search,
   Shield,
+  Trash2,
+  UserCog,
   Users as UsersIcon,
   X,
 } from "lucide-react";
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import {
+  FormEvent,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 
-type UserRole = "ADMIN" | "STAFF" | "CLIENT";
+type UserRole = "ADMIN" | "STAFF";
 
 type User = {
   id: string;
@@ -22,12 +29,7 @@ type User = {
   role: UserRole;
   isActive: boolean;
   createdAt: string;
-  client: {
-    id: string;
-    companyName: string | null;
-    city: string | null;
-    province: string | null;
-  } | null;
+  updatedAt?: string;
 };
 
 type UserForm = {
@@ -35,24 +37,34 @@ type UserForm = {
   email: string;
   phone: string;
   role: UserRole;
-  passwordHash: string;
+  password: string;
 };
 
 const emptyForm: UserForm = {
   name: "",
   email: "",
   phone: "",
-  role: "CLIENT",
-  passwordHash: "",
+  role: "STAFF",
+  password: "",
 };
 
 export default function UsersPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
+
   const [search, setSearch] = useState("");
+
   const [modalOpen, setModalOpen] = useState(false);
   const [form, setForm] = useState<UserForm>(emptyForm);
+
   const [saving, setSaving] = useState(false);
+  const [updatingId, setUpdatingId] = useState<string | null>(
+    null,
+  );
+  const [deletingId, setDeletingId] = useState<string | null>(
+    null,
+  );
+
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
@@ -69,10 +81,12 @@ export default function UsersPage() {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || "Failed to load users.");
+        throw new Error(
+          data.error || "Failed to load users.",
+        );
       }
 
-      setUsers(data);
+      setUsers(Array.isArray(data) ? data : []);
     } catch (err) {
       console.error(err);
 
@@ -103,9 +117,7 @@ export default function UsersPage() {
         user.email,
         user.phone,
         user.role,
-        user.client?.companyName,
-        user.client?.city,
-        user.client?.province,
+        user.isActive ? "active" : "inactive",
       ]
         .filter(Boolean)
         .join(" ")
@@ -114,6 +126,18 @@ export default function UsersPage() {
       return searchableText.includes(query);
     });
   }, [users, search]);
+
+  const activeUsers = users.filter(
+    (user) => user.isActive,
+  ).length;
+
+  const admins = users.filter(
+    (user) => user.role === "ADMIN",
+  ).length;
+
+  const staff = users.filter(
+    (user) => user.role === "STAFF",
+  ).length;
 
   function updateField(
     field: keyof UserForm,
@@ -139,9 +163,20 @@ export default function UsersPage() {
 
     setModalOpen(false);
     setForm(emptyForm);
+    setError("");
   }
 
-  async function createUser(event: FormEvent<HTMLFormElement>) {
+  function showSuccess(message: string) {
+    setSuccess(message);
+
+    window.setTimeout(() => {
+      setSuccess("");
+    }, 2500);
+  }
+
+  async function createUser(
+    event: FormEvent<HTMLFormElement>,
+  ) {
     event.preventDefault();
 
     try {
@@ -151,28 +186,37 @@ export default function UsersPage() {
 
       const response = await fetch("/api/users", {
         method: "POST",
+
         headers: {
           "Content-Type": "application/json",
         },
+
         body: JSON.stringify(form),
       });
 
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || "Failed to create user.");
+        throw new Error(
+          data.error || "Failed to create user.",
+        );
       }
 
-      setUsers((current) => [data, ...current]);
+      setUsers((current) => [
+        data,
+        ...current,
+      ]);
 
-      setSuccess("User created successfully.");
+      setSuccess(
+        `${formatRole(data.role)} account created successfully.`,
+      );
 
       setForm(emptyForm);
 
-      setTimeout(() => {
+      window.setTimeout(() => {
         setModalOpen(false);
         setSuccess("");
-      }, 800);
+      }, 900);
     } catch (err) {
       console.error(err);
 
@@ -186,59 +230,217 @@ export default function UsersPage() {
     }
   }
 
-  const activeUsers = users.filter((user) => user.isActive).length;
-  const admins = users.filter((user) => user.role === "ADMIN").length;
-  const staff = users.filter((user) => user.role === "STAFF").length;
-  const clients = users.filter((user) => user.role === "CLIENT").length;
+  async function changeRole(
+    user: User,
+    role: UserRole,
+  ) {
+    if (user.role === role) {
+      return;
+    }
+
+    try {
+      setUpdatingId(user.id);
+      setError("");
+
+      const response = await fetch("/api/users", {
+        method: "PATCH",
+
+        headers: {
+          "Content-Type": "application/json",
+        },
+
+        body: JSON.stringify({
+          id: user.id,
+          role,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data.error || "Failed to change user role.",
+        );
+      }
+
+      setUsers((current) =>
+        current.map((item) =>
+          item.id === data.id ? data : item,
+        ),
+      );
+
+      showSuccess(
+        `${data.name || data.email} is now ${formatRole(
+          data.role,
+        )}.`,
+      );
+    } catch (err) {
+      console.error(err);
+
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Failed to change user role.",
+      );
+    } finally {
+      setUpdatingId(null);
+    }
+  }
+
+  async function toggleUserStatus(user: User) {
+    try {
+      setUpdatingId(user.id);
+      setError("");
+
+      const response = await fetch("/api/users", {
+        method: "PATCH",
+
+        headers: {
+          "Content-Type": "application/json",
+        },
+
+        body: JSON.stringify({
+          id: user.id,
+          isActive: !user.isActive,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data.error ||
+            "Failed to update account status.",
+        );
+      }
+
+      setUsers((current) =>
+        current.map((item) =>
+          item.id === data.id ? data : item,
+        ),
+      );
+
+      showSuccess(
+        `${data.name || data.email} ${
+          data.isActive
+            ? "activated"
+            : "deactivated"
+        } successfully.`,
+      );
+    } catch (err) {
+      console.error(err);
+
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Failed to update account status.",
+      );
+    } finally {
+      setUpdatingId(null);
+    }
+  }
+
+  async function deleteUser(user: User) {
+    const confirmed = window.confirm(
+      `Delete ${
+        user.name || user.email
+      }? This account will permanently lose access.`,
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      setDeletingId(user.id);
+      setError("");
+
+      const response = await fetch(
+        `/api/users?id=${encodeURIComponent(user.id)}`,
+        {
+          method: "DELETE",
+        },
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data.error || "Failed to delete user.",
+        );
+      }
+
+      setUsers((current) =>
+        current.filter(
+          (item) => item.id !== user.id,
+        ),
+      );
+
+      showSuccess("User deleted successfully.");
+    } catch (err) {
+      console.error(err);
+
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Failed to delete user.",
+      );
+    } finally {
+      setDeletingId(null);
+    }
+  }
 
   return (
     <main className="min-h-screen overflow-hidden bg-[#050505] text-white">
-      <div className="pointer-events-none fixed inset-0">
+      <div className="pointer-events-none fixed inset-0 -z-10">
         <div className="absolute -left-40 -top-40 h-[500px] w-[500px] rounded-full bg-[#b89235]/[0.06] blur-[140px]" />
 
         <div className="absolute -bottom-40 -right-40 h-[500px] w-[500px] rounded-full bg-[#8a6a22]/[0.05] blur-[140px]" />
-
-        <div
-          className="absolute inset-0 opacity-[0.025]"
-          style={{
-            backgroundImage: `
-              linear-gradient(rgba(255,255,255,0.5) 1px, transparent 1px),
-              linear-gradient(90deg, rgba(255,255,255,0.5) 1px, transparent 1px)
-            `,
-            backgroundSize: "80px 80px",
-          }}
-        />
       </div>
 
       <div className="relative mx-auto max-w-[1600px] px-5 py-8 sm:px-8 lg:px-10 lg:py-10">
         <div className="flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
           <div>
             <p className="mb-3 text-xs font-medium uppercase tracking-[0.2em] text-[#c5a34a]/70">
-              Company Portal
+              Administration
             </p>
 
             <h1 className="text-3xl font-semibold tracking-[-0.04em] sm:text-4xl">
-              Users
+              User Management
             </h1>
 
             <p className="mt-3 max-w-xl text-sm leading-6 text-white/35">
-              Manage administrators, staff members and client users.
+              Manage administrator and staff accounts that
+              have access to the MC Legacy management portal.
             </p>
           </div>
 
           <button
+            type="button"
             onClick={openModal}
-            className="flex items-center justify-center gap-2 rounded-xl bg-[#c5a34a] px-5 py-3 text-sm font-semibold text-black transition hover:bg-[#d4b45c] active:scale-[0.98]"
+            className="flex items-center justify-center gap-2 rounded-xl bg-[#c5a34a] px-5 py-3 text-sm font-semibold text-black transition hover:bg-[#d4b45c]"
           >
             <Plus size={17} />
-            Add User
+            Add Account
           </button>
         </div>
 
-        <div className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+        {error && !modalOpen && (
+          <div className="mt-6 rounded-xl border border-red-500/20 bg-red-500/[0.06] px-4 py-3 text-sm text-red-300">
+            {error}
+          </div>
+        )}
+
+        {success && !modalOpen && (
+          <div className="mt-6 rounded-xl border border-green-500/20 bg-green-500/[0.06] px-4 py-3 text-sm text-green-300">
+            {success}
+          </div>
+        )}
+
+        <div className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           <StatCard
             icon={<UsersIcon size={19} />}
-            title="Total Users"
+            title="Total Accounts"
             value={users.length}
           />
 
@@ -250,20 +452,14 @@ export default function UsersPage() {
 
           <StatCard
             icon={<Shield size={19} />}
-            title="Admins"
+            title="Administrators"
             value={admins}
           />
 
           <StatCard
-            icon={<UsersIcon size={19} />}
+            icon={<UserCog size={19} />}
             title="Staff"
             value={staff}
-          />
-
-          <StatCard
-            icon={<UsersIcon size={19} />}
-            title="Clients"
-            value={clients}
           />
         </div>
 
@@ -271,12 +467,12 @@ export default function UsersPage() {
           <div className="flex flex-col gap-4 border-b border-white/[0.06] p-5 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h2 className="text-sm font-semibold">
-                User Directory
+                Portal Accounts
               </h2>
 
               <p className="mt-1 text-xs text-white/30">
-                {filteredUsers.length} user
-                {filteredUsers.length === 1 ? "" : "s"} found
+                {filteredUsers.length} account
+                {filteredUsers.length === 1 ? "" : "s"}
               </p>
             </div>
 
@@ -288,18 +484,14 @@ export default function UsersPage() {
 
               <input
                 value={search}
-                onChange={(event) => setSearch(event.target.value)}
-                placeholder="Search users..."
-                className="w-full rounded-xl border border-white/[0.07] bg-white/[0.025] py-2.5 pl-10 pr-4 text-sm text-white outline-none placeholder:text-white/20 transition focus:border-[#c5a34a]/30"
+                onChange={(event) =>
+                  setSearch(event.target.value)
+                }
+                placeholder="Search accounts..."
+                className="w-full rounded-xl border border-white/[0.07] bg-white/[0.025] py-2.5 pl-10 pr-4 text-sm text-white outline-none placeholder:text-white/20 focus:border-[#c5a34a]/30"
               />
             </div>
           </div>
-
-          {error && !modalOpen && (
-            <div className="m-5 rounded-xl border border-red-500/20 bg-red-500/[0.06] px-4 py-3 text-sm text-red-300">
-              {error}
-            </div>
-          )}
 
           {loading ? (
             <div className="flex min-h-[320px] items-center justify-center">
@@ -307,148 +499,259 @@ export default function UsersPage() {
                 <div className="mx-auto h-8 w-8 animate-spin rounded-full border-2 border-white/10 border-t-[#c5a34a]" />
 
                 <p className="mt-4 text-xs text-white/30">
-                  Loading users...
+                  Loading accounts...
                 </p>
               </div>
             </div>
           ) : filteredUsers.length === 0 ? (
             <div className="flex min-h-[360px] items-center justify-center p-8">
               <div className="max-w-sm text-center">
-                <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl border border-white/[0.07] bg-white/[0.025]">
-                  <UsersIcon
-                    size={25}
-                    strokeWidth={1.5}
-                    className="text-white/25"
-                  />
-                </div>
+                <UsersIcon
+                  size={28}
+                  className="mx-auto text-white/20"
+                />
 
                 <h3 className="mt-5 text-sm font-medium text-white/70">
-                  {search ? "No users found" : "No users yet"}
+                  {search
+                    ? "No accounts found"
+                    : "No accounts yet"}
                 </h3>
 
                 <p className="mt-2 text-xs leading-5 text-white/25">
                   {search
-                    ? "Try a different name, email or role."
-                    : "Add your first user to start managing your company portal."}
+                    ? "Try another name, email or role."
+                    : "Add an administrator or staff account to the portal."}
                 </p>
-
-                {!search && (
-                  <button
-                    onClick={openModal}
-                    className="mt-6 inline-flex items-center gap-2 rounded-xl bg-[#c5a34a] px-5 py-2.5 text-xs font-semibold text-black transition hover:bg-[#d4b45c]"
-                  >
-                    <Plus size={15} />
-                    Add First User
-                  </button>
-                )}
               </div>
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left">
-                <thead className="border-b border-white/[0.06] bg-white/[0.015]">
-                  <tr>
-                    <th className="px-6 py-4 text-[10px] font-medium uppercase tracking-[0.16em] text-white/25">
-                      User
-                    </th>
+            <>
+              <div className="hidden overflow-x-auto lg:block">
+                <table className="w-full text-left">
+                  <thead className="border-b border-white/[0.06] bg-white/[0.015]">
+                    <tr>
+                      <TableHeading>User</TableHeading>
+                      <TableHeading>Contact</TableHeading>
+                      <TableHeading>Role</TableHeading>
+                      <TableHeading>Status</TableHeading>
 
-                    <th className="px-6 py-4 text-[10px] font-medium uppercase tracking-[0.16em] text-white/25">
-                      Contact
-                    </th>
+                      <th className="px-6 py-4 text-right text-[10px] font-medium uppercase tracking-[0.16em] text-white/25">
+                        Actions
+                      </th>
+                    </tr>
+                  </thead>
 
-                    <th className="px-6 py-4 text-[10px] font-medium uppercase tracking-[0.16em] text-white/25">
-                      Role
-                    </th>
+                  <tbody>
+                    {filteredUsers.map((user) => (
+                      <tr
+                        key={user.id}
+                        className="border-b border-white/[0.04] transition hover:bg-white/[0.02]"
+                      >
+                        <td className="px-6 py-5">
+                          <div className="flex items-center gap-3">
+                            <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-[#c5a34a]/15 bg-[#c5a34a]/[0.06] text-xs font-semibold text-[#d4b45c]">
+                              {getInitials(user.name)}
+                            </div>
 
-                    <th className="px-6 py-4 text-[10px] font-medium uppercase tracking-[0.16em] text-white/25">
-                      Client
-                    </th>
+                            <div>
+                              <p className="text-sm font-medium text-white/80">
+                                {user.name || "Unnamed User"}
+                              </p>
 
-                    <th className="px-6 py-4 text-[10px] font-medium uppercase tracking-[0.16em] text-white/25">
-                      Status
-                    </th>
-                  </tr>
-                </thead>
-
-                <tbody>
-                  {filteredUsers.map((user) => (
-                    <tr
-                      key={user.id}
-                      className="border-b border-white/[0.04] transition hover:bg-white/[0.02]"
-                    >
-                      <td className="px-6 py-5">
-                        <div className="flex items-center gap-3">
-                          <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-[#c5a34a]/15 bg-[#c5a34a]/[0.06] text-xs font-semibold text-[#d4b45c]">
-                            {getInitials(user.name)}
+                              <p className="mt-1 text-xs text-white/25">
+                                {user.email}
+                              </p>
+                            </div>
                           </div>
+                        </td>
 
-                          <div>
-                            <p className="text-sm font-medium text-white/80">
-                              {user.name || "Unnamed User"}
-                            </p>
-
-                            <p className="mt-1 text-xs text-white/25">
+                        <td className="px-6 py-5">
+                          <div className="space-y-1">
+                            <p className="flex items-center gap-2 text-xs text-white/40">
+                              <Mail size={13} />
                               {user.email}
                             </p>
-                          </div>
-                        </div>
-                      </td>
 
-                      <td className="px-6 py-5">
-                        <div className="space-y-1">
-                          <p className="flex items-center gap-2 text-xs text-white/40">
-                            <Mail size={13} />
-                            {user.email}
-                          </p>
-
-                          {user.phone && (
-                            <p className="flex items-center gap-2 text-xs text-white/25">
-                              <Phone size={13} />
-                              {user.phone}
-                            </p>
-                          )}
-                        </div>
-                      </td>
-
-                      <td className="px-6 py-5">
-                        <RoleBadge role={user.role} />
-                      </td>
-
-                      <td className="px-6 py-5">
-                        {user.client ? (
-                          <div>
-                            <p className="text-sm text-white/60">
-                              {user.client.companyName ||
-                                "Private Client"}
-                            </p>
-
-                            {(user.client.city ||
-                              user.client.province) && (
-                              <p className="mt-1 text-xs text-white/25">
-                                {[
-                                  user.client.city,
-                                  user.client.province,
-                                ]
-                                  .filter(Boolean)
-                                  .join(", ")}
+                            {user.phone && (
+                              <p className="flex items-center gap-2 text-xs text-white/25">
+                                <Phone size={13} />
+                                {user.phone}
                               </p>
                             )}
                           </div>
-                        ) : (
-                          <span className="text-xs text-white/20">
-                            Not linked
-                          </span>
-                        )}
-                      </td>
+                        </td>
 
-                      <td className="px-6 py-5">
-                        <StatusBadge active={user.isActive} />
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                        <td className="px-6 py-5">
+                          <select
+                            value={user.role}
+                            disabled={
+                              updatingId === user.id ||
+                              deletingId === user.id
+                            }
+                            onChange={(event) =>
+                              changeRole(
+                                user,
+                                event.target
+                                  .value as UserRole,
+                              )
+                            }
+                            className="rounded-lg border border-white/[0.08] bg-[#111] px-3 py-2 text-xs text-white/60 outline-none focus:border-[#c5a34a]/30 disabled:opacity-40"
+                          >
+                            <option value="STAFF">
+                              Staff
+                            </option>
+
+                            <option value="ADMIN">
+                              Administrator
+                            </option>
+                          </select>
+                        </td>
+
+                        <td className="px-6 py-5">
+                          <StatusBadge
+                            active={user.isActive}
+                          />
+                        </td>
+
+                        <td className="px-6 py-5">
+                          <div className="flex justify-end gap-2">
+                            <button
+                              type="button"
+                              disabled={
+                                updatingId === user.id ||
+                                deletingId === user.id
+                              }
+                              onClick={() =>
+                                toggleUserStatus(user)
+                              }
+                              className={`rounded-lg border px-3 py-2 text-xs transition disabled:opacity-40 ${
+                                user.isActive
+                                  ? "border-orange-500/15 bg-orange-500/[0.05] text-orange-300 hover:bg-orange-500/[0.08]"
+                                  : "border-green-500/15 bg-green-500/[0.05] text-green-300 hover:bg-green-500/[0.08]"
+                              }`}
+                            >
+                              {updatingId === user.id
+                                ? "Updating..."
+                                : user.isActive
+                                  ? "Deactivate"
+                                  : "Activate"}
+                            </button>
+
+                            <button
+                              type="button"
+                              disabled={
+                                deletingId === user.id ||
+                                updatingId === user.id
+                              }
+                              onClick={() =>
+                                deleteUser(user)
+                              }
+                              className="rounded-lg border border-red-500/15 bg-red-500/[0.05] p-2 text-red-300 transition hover:bg-red-500/[0.1] disabled:opacity-40"
+                              title="Delete user"
+                            >
+                              {deletingId === user.id ? (
+                                <span className="block h-4 w-4 animate-spin rounded-full border border-red-300/20 border-t-red-300" />
+                              ) : (
+                                <Trash2 size={15} />
+                              )}
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="grid gap-3 p-4 lg:hidden">
+                {filteredUsers.map((user) => (
+                  <div
+                    key={user.id}
+                    className="rounded-xl border border-white/[0.06] bg-white/[0.015] p-4"
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[#c5a34a]/15 bg-[#c5a34a]/[0.06] text-xs font-semibold text-[#d4b45c]">
+                        {getInitials(user.name)}
+                      </div>
+
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-medium text-white/80">
+                          {user.name || "Unnamed User"}
+                        </p>
+
+                        <p className="mt-1 truncate text-xs text-white/25">
+                          {user.email}
+                        </p>
+
+                        <div className="mt-3 flex items-center gap-2">
+                          <RoleBadge role={user.role} />
+
+                          <StatusBadge
+                            active={user.isActive}
+                          />
+                        </div>
+
+                        <div className="mt-4 grid gap-2">
+                          <select
+                            value={user.role}
+                            disabled={
+                              updatingId === user.id ||
+                              deletingId === user.id
+                            }
+                            onChange={(event) =>
+                              changeRole(
+                                user,
+                                event.target
+                                  .value as UserRole,
+                              )
+                            }
+                            className="rounded-lg border border-white/[0.08] bg-[#111] px-3 py-2 text-xs text-white/60"
+                          >
+                            <option value="STAFF">
+                              Staff
+                            </option>
+
+                            <option value="ADMIN">
+                              Administrator
+                            </option>
+                          </select>
+
+                          <div className="flex gap-2">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                toggleUserStatus(user)
+                              }
+                              disabled={
+                                updatingId === user.id
+                              }
+                              className="flex-1 rounded-lg border border-white/[0.08] px-3 py-2 text-xs text-white/50"
+                            >
+                              {user.isActive
+                                ? "Deactivate"
+                                : "Activate"}
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() =>
+                                deleteUser(user)
+                              }
+                              disabled={
+                                deletingId === user.id
+                              }
+                              className="rounded-lg border border-red-500/15 bg-red-500/[0.05] px-3 py-2 text-red-300"
+                            >
+                              <Trash2 size={15} />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </>
           )}
         </section>
       </div>
@@ -459,18 +762,19 @@ export default function UsersPage() {
             <div className="flex items-center justify-between border-b border-white/[0.07] px-6 py-5">
               <div>
                 <p className="text-xs uppercase tracking-[0.18em] text-[#c5a34a]/70">
-                  User Management
+                  Administration
                 </p>
 
                 <h2 className="mt-1 text-lg font-semibold">
-                  Add New User
+                  Add Portal Account
                 </h2>
               </div>
 
               <button
+                type="button"
                 onClick={closeModal}
                 disabled={saving}
-                className="rounded-xl p-2 text-white/30 transition hover:bg-white/[0.05] hover:text-white disabled:cursor-not-allowed"
+                className="rounded-xl p-2 text-white/30 transition hover:bg-white/[0.05] hover:text-white disabled:opacity-40"
               >
                 <X size={18} />
               </button>
@@ -509,7 +813,7 @@ export default function UsersPage() {
                     onChange={(value) =>
                       updateField("email", value)
                     }
-                    placeholder="john@example.com"
+                    placeholder="john@mclegacy.co.za"
                   />
 
                   <FormField
@@ -534,28 +838,37 @@ export default function UsersPage() {
                           event.target.value,
                         )
                       }
-                      className="w-full rounded-xl border border-white/[0.08] bg-[#111111] px-4 py-3 text-sm text-white outline-none transition focus:border-[#c5a34a]/30"
+                      className="w-full rounded-xl border border-white/[0.08] bg-[#111] px-4 py-3 text-sm text-white outline-none focus:border-[#c5a34a]/30"
                     >
-                      <option value="CLIENT">Client</option>
-                      <option value="STAFF">Staff</option>
-                      <option value="ADMIN">Administrator</option>
+                      <option value="STAFF">
+                        Staff
+                      </option>
+
+                      <option value="ADMIN">
+                        Administrator
+                      </option>
                     </select>
                   </label>
 
                   <div className="sm:col-span-2">
                     <FormField
-                      label="Password"
+                      label="Temporary Password"
                       required
                       type="password"
-                      value={form.passwordHash}
+                      value={form.password}
                       onChange={(value) =>
                         updateField(
-                          "passwordHash",
+                          "password",
                           value,
                         )
                       }
-                      placeholder="Enter temporary password"
+                      placeholder="Minimum 8 characters"
                     />
+
+                    <p className="mt-2 text-xs text-white/20">
+                      The password is securely hashed
+                      before being stored.
+                    </p>
                   </div>
                 </div>
               </div>
@@ -565,7 +878,7 @@ export default function UsersPage() {
                   type="button"
                   onClick={closeModal}
                   disabled={saving}
-                  className="rounded-xl border border-white/[0.08] px-5 py-3 text-sm font-medium text-white/50 transition hover:bg-white/[0.04] hover:text-white disabled:cursor-not-allowed"
+                  className="rounded-xl border border-white/[0.08] px-5 py-3 text-sm text-white/50"
                 >
                   Cancel
                 </button>
@@ -573,9 +886,11 @@ export default function UsersPage() {
                 <button
                   type="submit"
                   disabled={saving}
-                  className="rounded-xl bg-[#c5a34a] px-6 py-3 text-sm font-semibold text-black transition hover:bg-[#d4b45c] disabled:cursor-not-allowed disabled:opacity-50"
+                  className="rounded-xl bg-[#c5a34a] px-6 py-3 text-sm font-semibold text-black transition hover:bg-[#d4b45c] disabled:opacity-50"
                 >
-                  {saving ? "Creating..." : "Create User"}
+                  {saving
+                    ? "Creating..."
+                    : "Create Account"}
                 </button>
               </div>
             </form>
@@ -583,6 +898,18 @@ export default function UsersPage() {
         </div>
       )}
     </main>
+  );
+}
+
+function TableHeading({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <th className="px-6 py-4 text-[10px] font-medium uppercase tracking-[0.16em] text-white/25">
+      {children}
+    </th>
   );
 }
 
@@ -637,7 +964,9 @@ function FormField({
         {label}
 
         {required && (
-          <span className="ml-1 text-[#c5a34a]">*</span>
+          <span className="ml-1 text-[#c5a34a]">
+            *
+          </span>
         )}
       </span>
 
@@ -649,27 +978,29 @@ function FormField({
           onChange(event.target.value)
         }
         placeholder={placeholder}
-        className="w-full rounded-xl border border-white/[0.08] bg-white/[0.025] px-4 py-3 text-sm text-white outline-none placeholder:text-white/20 transition focus:border-[#c5a34a]/30 focus:bg-white/[0.035]"
+        className="w-full rounded-xl border border-white/[0.08] bg-white/[0.025] px-4 py-3 text-sm text-white outline-none placeholder:text-white/20 focus:border-[#c5a34a]/30"
       />
     </label>
   );
 }
 
-function RoleBadge({ role }: { role: UserRole }) {
-  const labels = {
-    ADMIN: "Administrator",
-    STAFF: "Staff",
-    CLIENT: "Client",
-  };
-
+function RoleBadge({
+  role,
+}: {
+  role: UserRole;
+}) {
   return (
     <span className="inline-flex rounded-full border border-[#c5a34a]/15 bg-[#c5a34a]/[0.06] px-2.5 py-1 text-[10px] font-medium text-[#d4b45c]">
-      {labels[role]}
+      {formatRole(role)}
     </span>
   );
 }
 
-function StatusBadge({ active }: { active: boolean }) {
+function StatusBadge({
+  active,
+}: {
+  active: boolean;
+}) {
   return (
     <span
       className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-medium ${
@@ -680,7 +1011,9 @@ function StatusBadge({ active }: { active: boolean }) {
     >
       <span
         className={`h-1.5 w-1.5 rounded-full ${
-          active ? "bg-green-400" : "bg-white/25"
+          active
+            ? "bg-green-400"
+            : "bg-white/25"
         }`}
       />
 
@@ -689,16 +1022,29 @@ function StatusBadge({ active }: { active: boolean }) {
   );
 }
 
-function getInitials(name: string | null) {
+function formatRole(role: UserRole) {
+  return role === "ADMIN"
+    ? "Administrator"
+    : "Staff";
+}
+
+function getInitials(
+  name: string | null,
+) {
   if (!name) {
     return "MC";
   }
 
-  const parts = name.trim().split(/\s+/);
+  const parts =
+    name.trim().split(/\s+/);
 
   if (parts.length === 1) {
-    return parts[0].slice(0, 2).toUpperCase();
+    return parts[0]
+      .slice(0, 2)
+      .toUpperCase();
   }
 
-  return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase();
+  return `${parts[0][0]}${
+    parts[parts.length - 1][0]
+  }`.toUpperCase();
 }

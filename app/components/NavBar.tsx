@@ -1,4 +1,3 @@
-
 "use client";
 
 import {
@@ -11,119 +10,149 @@ import {
   Home,
   LogOut,
   Menu,
-  MessageSquare,
   Receipt,
   Settings,
   UserRound,
   Users,
   X,
 } from "lucide-react";
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { signOut, useSession } from "next-auth/react";
+import { useMemo, useState } from "react";
 
 const navigation = [
   {
     label: "Overview",
-    href: "/",
+    href: "/dashboard",
     icon: Home,
+    adminOnly: false,
   },
   {
     label: "Clients",
     href: "/clients",
     icon: Users,
+    adminOnly: false,
   },
   {
     label: "Users",
     href: "/users",
     icon: UserRound,
+    adminOnly: true,
   },
   {
     label: "Enquiries",
     href: "/enquiries",
     icon: ClipboardList,
+    adminOnly: false,
   },
   {
     label: "Bookings",
     href: "/bookings",
     icon: CalendarDays,
+    adminOnly: false,
   },
   {
     label: "Files",
     href: "/files",
     icon: FolderOpen,
+    adminOnly: false,
   },
   {
     label: "Contracts",
     href: "/contracts",
     icon: FileText,
+    adminOnly: false,
   },
   {
     label: "Invoices",
     href: "/invoices",
     icon: Receipt,
-  },
-  {
-    label: "Messages",
-    href: "/messages",
-    icon: MessageSquare,
+    adminOnly: false,
   },
   {
     label: "Notifications",
     href: "/notifications",
     icon: Bell,
+    adminOnly: false,
   },
 ];
 
 export default function NavBar() {
   const pathname = usePathname();
+  const { data: session, status } = useSession();
+
   const [mobileOpen, setMobileOpen] = useState(false);
 
-  function isActive(href: string) {
-    if (href === "/") {
-      return pathname === "/";
-    }
+  const role = session?.user?.role;
+  const isAdmin = role === "ADMIN";
 
-    return pathname === href || pathname.startsWith(`${href}/`);
+  const visibleNavigation = useMemo(() => {
+    return navigation.filter(
+      (item) => !item.adminOnly || isAdmin,
+    );
+  }, [isAdmin]);
+
+  function isActive(href: string) {
+    return (
+      pathname === href ||
+      pathname.startsWith(`${href}/`)
+    );
   }
 
   function closeMobile() {
     setMobileOpen(false);
   }
 
+  async function handleSignOut() {
+    setMobileOpen(false);
+
+    await signOut({
+      callbackUrl: "/login",
+    });
+  }
+
+  const displayName =
+    session?.user?.name ||
+    session?.user?.email ||
+    "Portal User";
+
+  const initials = getInitials(
+    session?.user?.name ?? null,
+  );
+
   return (
     <>
-      {/* Desktop Sidebar */}
+      {/* DESKTOP SIDEBAR */}
       <aside className="fixed inset-y-0 left-0 z-40 hidden w-[250px] border-r border-white/[0.07] bg-[#080808] lg:flex lg:flex-col">
-        {/* Logo */}
-        <div className="flex h-[82px] items-center border-b border-white/[0.07] px-6">
-          <Link href="/" className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-[#c5a34a]/20 bg-[#c5a34a]/[0.07]">
-              <span className="text-sm font-bold tracking-tight text-[#c5a34a]">
-                MC
-              </span>
-            </div>
-
-            <div>
-              <p className="text-sm font-semibold tracking-wide text-white">
-                MC Legacy
-              </p>
-
-              <p className="mt-0.5 text-[10px] uppercase tracking-[0.18em] text-white/25">
-                Company Portal
-              </p>
+        {/* BRAND / LOGO */}
+        <div className="flex h-[118px] items-center border-b border-white/[0.07] px-4">
+          <Link
+            href="/dashboard"
+            className="group flex w-full items-center"
+          >
+            <div className="relative h-[84px] w-[220px]">
+              <Image
+                src="/images/mc-legacy-logo.png"
+                alt="MC Legacy Media"
+                fill
+                priority
+                sizes="220px"
+                className="object-contain object-left"
+              />
             </div>
           </Link>
         </div>
 
-        {/* Navigation */}
+        {/* NAVIGATION */}
         <nav className="flex-1 overflow-y-auto px-3 py-5">
           <p className="mb-3 px-3 text-[10px] font-medium uppercase tracking-[0.18em] text-white/20">
             Management
           </p>
 
           <div className="space-y-1">
-            {navigation.map((item) => {
+            {visibleNavigation.map((item) => {
               const Icon = item.icon;
               const active = isActive(item.href);
 
@@ -163,8 +192,33 @@ export default function NavBar() {
           </div>
         </nav>
 
-        {/* Bottom */}
+        {/* USER */}
         <div className="border-t border-white/[0.07] p-3">
+          <div className="mb-3 rounded-xl border border-white/[0.06] bg-white/[0.02] p-3">
+            <div className="flex items-center gap-3">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[#c5a34a]/15 bg-[#c5a34a]/[0.07] text-xs font-semibold text-[#d4b45c]">
+                {initials}
+              </div>
+
+              <div className="min-w-0">
+                <p className="truncate text-xs font-medium text-white/70">
+                  {status === "loading"
+                    ? "Loading..."
+                    : displayName}
+                </p>
+
+                <p className="mt-1 text-[10px] uppercase tracking-[0.14em] text-white/25">
+                  {role === "ADMIN"
+                    ? "Administrator"
+                    : role === "STAFF"
+                      ? "Staff"
+                      : "Portal User"}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* SETTINGS */}
           <Link
             href="/settings"
             className={`group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition ${
@@ -175,55 +229,72 @@ export default function NavBar() {
           >
             <Settings
               size={17}
-              className="text-white/25 transition group-hover:text-[#c5a34a]"
+              className={`transition ${
+                isActive("/settings")
+                  ? "text-[#c5a34a]"
+                  : "text-white/25 group-hover:text-[#c5a34a]"
+              }`}
             />
 
             <span>Settings</span>
           </Link>
 
+          {/* SIGN OUT */}
           <button
             type="button"
+            onClick={handleSignOut}
             className="group mt-1 flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-white/35 transition hover:bg-red-500/[0.05] hover:text-red-400"
           >
-            <LogOut size={17} className="text-white/25" />
+            <LogOut
+              size={17}
+              className="text-white/25 transition group-hover:text-red-400"
+            />
 
             <span>Sign out</span>
           </button>
         </div>
       </aside>
 
-      {/* Mobile Header */}
-      <header className="sticky top-0 z-50 flex h-16 items-center justify-between border-b border-white/[0.07] bg-[#080808]/95 px-5 backdrop-blur-xl lg:hidden">
+      {/* MOBILE HEADER */}
+      <header className="sticky top-0 z-50 flex h-[76px] items-center justify-between border-b border-white/[0.07] bg-[#080808]/95 px-5 backdrop-blur-xl lg:hidden">
         <Link
-          href="/"
+          href="/dashboard"
           onClick={closeMobile}
-          className="flex items-center gap-3"
+          className="group flex items-center"
         >
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg border border-[#c5a34a]/20 bg-[#c5a34a]/[0.07]">
-            <span className="text-xs font-bold text-[#c5a34a]">MC</span>
-          </div>
-
-          <div>
-            <p className="text-sm font-semibold text-white">MC Legacy</p>
-
-            <p className="text-[9px] uppercase tracking-[0.16em] text-white/25">
-              Company Portal
-            </p>
+          <div className="relative h-[56px] w-[160px]">
+            <Image
+              src="/images/mc-legacy-logo.png"
+              alt="MC Legacy Media"
+              fill
+              priority
+              sizes="160px"
+              className="object-contain object-left"
+            />
           </div>
         </Link>
 
-        {/* Hamburger */}
         <button
           type="button"
-          onClick={() => setMobileOpen((current) => !current)}
-          aria-label={mobileOpen ? "Close navigation" : "Open navigation"}
-          className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/[0.08] bg-white/[0.025] text-white/60 transition hover:bg-white/[0.05] hover:text-white"
+          onClick={() =>
+            setMobileOpen((current) => !current)
+          }
+          aria-label={
+            mobileOpen
+              ? "Close navigation"
+              : "Open navigation"
+          }
+          className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/[0.08] bg-white/[0.025] text-white/60 transition hover:border-[#c5a34a]/20 hover:bg-white/[0.05] hover:text-white"
         >
-          {mobileOpen ? <X size={20} /> : <Menu size={20} />}
+          {mobileOpen ? (
+            <X size={20} />
+          ) : (
+            <Menu size={20} />
+          )}
         </button>
       </header>
 
-      {/* Mobile Navigation */}
+      {/* MOBILE MENU */}
       {mobileOpen && (
         <>
           <button
@@ -233,14 +304,39 @@ export default function NavBar() {
             className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm lg:hidden"
           />
 
-          <div className="fixed left-0 right-0 top-16 z-50 max-h-[calc(100vh-4rem)] overflow-y-auto border-b border-white/[0.07] bg-[#080808] shadow-2xl lg:hidden">
+          <div className="fixed left-0 right-0 top-[76px] z-50 max-h-[calc(100vh-76px)] overflow-y-auto border-b border-white/[0.07] bg-[#080808] shadow-2xl lg:hidden">
             <nav className="px-4 py-5">
+              {/* MOBILE USER */}
+              <div className="mb-5 rounded-xl border border-white/[0.06] bg-white/[0.02] p-4">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-[#c5a34a]/15 bg-[#c5a34a]/[0.07] text-xs font-semibold text-[#d4b45c]">
+                    {initials}
+                  </div>
+
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium text-white/70">
+                      {status === "loading"
+                        ? "Loading..."
+                        : displayName}
+                    </p>
+
+                    <p className="mt-1 text-[10px] uppercase tracking-[0.14em] text-white/25">
+                      {role === "ADMIN"
+                        ? "Administrator"
+                        : role === "STAFF"
+                          ? "Staff"
+                          : "Portal User"}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
               <p className="mb-3 px-3 text-[10px] font-medium uppercase tracking-[0.18em] text-white/20">
                 Management
               </p>
 
               <div className="space-y-1">
-                {navigation.map((item) => {
+                {visibleNavigation.map((item) => {
                   const Icon = item.icon;
                   const active = isActive(item.href);
 
@@ -259,7 +355,9 @@ export default function NavBar() {
                         size={18}
                         strokeWidth={1.7}
                         className={
-                          active ? "text-[#c5a34a]" : "text-white/30"
+                          active
+                            ? "text-[#c5a34a]"
+                            : "text-white/30"
                         }
                       />
 
@@ -274,23 +372,38 @@ export default function NavBar() {
                 })}
               </div>
 
+              {/* MOBILE SETTINGS / SIGNOUT */}
               <div className="mt-5 border-t border-white/[0.07] pt-4">
                 <Link
                   href="/settings"
                   onClick={closeMobile}
-                  className="flex items-center gap-3 rounded-xl px-4 py-3 text-sm text-white/40 transition hover:bg-white/[0.04] hover:text-white"
+                  className={`flex items-center gap-3 rounded-xl px-4 py-3 text-sm transition ${
+                    isActive("/settings")
+                      ? "bg-[#c5a34a]/[0.09] text-white"
+                      : "text-white/40 hover:bg-white/[0.04] hover:text-white"
+                  }`}
                 >
-                  <Settings size={18} className="text-white/30" />
+                  <Settings
+                    size={18}
+                    className={
+                      isActive("/settings")
+                        ? "text-[#c5a34a]"
+                        : "text-white/30"
+                    }
+                  />
 
                   <span>Settings</span>
                 </Link>
 
                 <button
                   type="button"
-                  onClick={closeMobile}
+                  onClick={handleSignOut}
                   className="mt-1 flex w-full items-center gap-3 rounded-xl px-4 py-3 text-sm text-white/40 transition hover:bg-red-500/[0.05] hover:text-red-400"
                 >
-                  <LogOut size={18} className="text-white/30" />
+                  <LogOut
+                    size={18}
+                    className="text-white/30"
+                  />
 
                   <span>Sign out</span>
                 </button>
@@ -303,3 +416,22 @@ export default function NavBar() {
   );
 }
 
+function getInitials(
+  name: string | null,
+) {
+  if (!name) {
+    return "MC";
+  }
+
+  const parts = name.trim().split(/\s+/);
+
+  if (parts.length === 1) {
+    return parts[0]
+      .slice(0, 2)
+      .toUpperCase();
+  }
+
+  return `${parts[0][0]}${
+    parts[parts.length - 1][0]
+  }`.toUpperCase();
+}

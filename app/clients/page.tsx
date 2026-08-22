@@ -2,7 +2,6 @@
 
 import {
   Building2,
-  Check,
   ChevronRight,
   Mail,
   MapPin,
@@ -16,19 +15,15 @@ import { FormEvent, useEffect, useMemo, useState } from "react";
 
 type Client = {
   id: string;
+  name: string;
+  email: string;
+  phone: string | null;
   companyName: string | null;
   address: string | null;
   city: string | null;
   province: string | null;
   notes: string | null;
   createdAt: string;
-
-  user: {
-    name: string | null;
-    email: string;
-    phone: string | null;
-    isActive: boolean;
-  };
 };
 
 type ClientForm = {
@@ -56,17 +51,11 @@ const emptyForm: ClientForm = {
 export default function ClientsPage() {
   const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
-
   const [search, setSearch] = useState("");
-
   const [modalOpen, setModalOpen] = useState(false);
-
   const [form, setForm] = useState<ClientForm>(emptyForm);
-
   const [saving, setSaving] = useState(false);
-
   const [error, setError] = useState("");
-
   const [success, setSuccess] = useState("");
 
   async function loadClients() {
@@ -85,7 +74,7 @@ export default function ClientsPage() {
         throw new Error(data.error || "Failed to load clients.");
       }
 
-      setClients(data);
+      setClients(Array.isArray(data) ? data : []);
     } catch (err) {
       console.error(err);
 
@@ -112,9 +101,9 @@ export default function ClientsPage() {
 
     return clients.filter((client) => {
       const searchableText = [
-        client.user.name,
-        client.user.email,
-        client.user.phone,
+        client.name,
+        client.email,
+        client.phone,
         client.companyName,
         client.city,
         client.province,
@@ -127,7 +116,10 @@ export default function ClientsPage() {
     });
   }, [clients, search]);
 
-  function updateField(field: keyof ClientForm, value: string) {
+  function updateField(
+    field: keyof ClientForm,
+    value: string,
+  ) {
     setForm((current) => ({
       ...current,
       [field]: value,
@@ -150,7 +142,9 @@ export default function ClientsPage() {
     setForm(emptyForm);
   }
 
-  async function createClient(event: FormEvent<HTMLFormElement>) {
+  async function createClient(
+    event: FormEvent<HTMLFormElement>,
+  ) {
     event.preventDefault();
 
     try {
@@ -173,9 +167,7 @@ export default function ClientsPage() {
       }
 
       setClients((current) => [data, ...current]);
-
       setSuccess("Client created successfully.");
-
       setForm(emptyForm);
 
       setTimeout(() => {
@@ -195,28 +187,23 @@ export default function ClientsPage() {
     }
   }
 
+  const companyCount = clients.filter(
+    (client) => Boolean(client.companyName),
+  ).length;
+
+  const privateClientCount = clients.filter(
+    (client) => !client.companyName,
+  ).length;
+
   return (
     <main className="min-h-screen overflow-hidden bg-[#050505] text-white">
-      {/* Ambient background */}
-      <div className="pointer-events-none fixed inset-0">
+      <div className="pointer-events-none fixed inset-0 -z-10">
         <div className="absolute -left-40 -top-40 h-[500px] w-[500px] rounded-full bg-[#b89235]/[0.06] blur-[140px]" />
 
         <div className="absolute -bottom-40 -right-40 h-[500px] w-[500px] rounded-full bg-[#8a6a22]/[0.05] blur-[140px]" />
-
-        <div
-          className="absolute inset-0 opacity-[0.025]"
-          style={{
-            backgroundImage: `
-              linear-gradient(rgba(255,255,255,0.5) 1px, transparent 1px),
-              linear-gradient(90deg, rgba(255,255,255,0.5) 1px, transparent 1px)
-            `,
-            backgroundSize: "80px 80px",
-          }}
-        />
       </div>
 
       <div className="relative mx-auto max-w-[1600px] px-5 py-8 sm:px-8 lg:px-10 lg:py-10">
-        {/* Header */}
         <div className="flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
           <div>
             <p className="mb-3 text-xs font-medium uppercase tracking-[0.2em] text-[#c5a34a]/70">
@@ -228,88 +215,44 @@ export default function ClientsPage() {
             </h1>
 
             <p className="mt-3 max-w-xl text-sm leading-6 text-white/35">
-              Manage your clients, companies and contact information from one
-              place.
+              Manage client contact information, companies and locations.
             </p>
           </div>
 
           <button
+            type="button"
             onClick={openModal}
-            className="flex items-center justify-center gap-2 rounded-xl bg-[#c5a34a] px-5 py-3 text-sm font-semibold text-black transition hover:bg-[#d4b45c] active:scale-[0.98]"
+            className="flex items-center justify-center gap-2 rounded-xl bg-[#c5a34a] px-5 py-3 text-sm font-semibold text-black transition hover:bg-[#d4b45c]"
           >
             <Plus size={17} />
-
             Add Client
           </button>
         </div>
 
-        {/* Stats */}
         <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          <div className="rounded-2xl border border-white/[0.07] bg-[#0b0b0b]/90 p-5">
-            <div className="flex items-center gap-3">
-              <div className="rounded-xl border border-[#c5a34a]/10 bg-[#c5a34a]/[0.06] p-3 text-[#c5a34a]">
-                <Users size={19} />
-              </div>
+          <StatCard
+            icon={<Users size={19} />}
+            title="Total Clients"
+            value={clients.length}
+          />
 
-              <div>
-                <p className="text-xs uppercase tracking-[0.14em] text-white/30">
-                  Total Clients
-                </p>
+          <StatCard
+            icon={<Building2 size={19} />}
+            title="Companies"
+            value={companyCount}
+          />
 
-                <p className="mt-1 text-2xl font-semibold">
-                  {clients.length}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div className="rounded-2xl border border-white/[0.07] bg-[#0b0b0b]/90 p-5">
-            <div className="flex items-center gap-3">
-              <div className="rounded-xl border border-[#c5a34a]/10 bg-[#c5a34a]/[0.06] p-3 text-[#c5a34a]">
-                <Check size={19} />
-              </div>
-
-              <div>
-                <p className="text-xs uppercase tracking-[0.14em] text-white/30">
-                  Active
-                </p>
-
-                <p className="mt-1 text-2xl font-semibold">
-                  {clients.filter((client) => client.user.isActive).length}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div className="rounded-2xl border border-white/[0.07] bg-[#0b0b0b]/90 p-5 sm:col-span-2 lg:col-span-1">
-            <div className="flex items-center gap-3">
-              <div className="rounded-xl border border-[#c5a34a]/10 bg-[#c5a34a]/[0.06] p-3 text-[#c5a34a]">
-                <Building2 size={19} />
-              </div>
-
-              <div>
-                <p className="text-xs uppercase tracking-[0.14em] text-white/30">
-                  Companies
-                </p>
-
-                <p className="mt-1 text-2xl font-semibold">
-                  {
-                    clients.filter(
-                      (client) => Boolean(client.companyName),
-                    ).length
-                  }
-                </p>
-              </div>
-            </div>
-          </div>
+          <StatCard
+            icon={<Users size={19} />}
+            title="Private Clients"
+            value={privateClientCount}
+          />
         </div>
 
-        {/* Client list */}
         <section className="mt-6 overflow-hidden rounded-2xl border border-white/[0.07] bg-[#0b0b0b]/90">
-          {/* Toolbar */}
           <div className="flex flex-col gap-4 border-b border-white/[0.06] p-5 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h2 className="text-sm font-semibold text-white">
+              <h2 className="text-sm font-semibold">
                 Client Directory
               </h2>
 
@@ -329,19 +272,17 @@ export default function ClientsPage() {
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
                 placeholder="Search clients..."
-                className="w-full rounded-xl border border-white/[0.07] bg-white/[0.025] py-2.5 pl-10 pr-4 text-sm text-white outline-none placeholder:text-white/20 transition focus:border-[#c5a34a]/30"
+                className="w-full rounded-xl border border-white/[0.07] bg-white/[0.025] py-2.5 pl-10 pr-4 text-sm text-white outline-none placeholder:text-white/20 focus:border-[#c5a34a]/30"
               />
             </div>
           </div>
 
-          {/* Errors */}
           {error && !modalOpen && (
             <div className="m-5 rounded-xl border border-red-500/20 bg-red-500/[0.06] px-4 py-3 text-sm text-red-300">
               {error}
             </div>
           )}
 
-          {/* Loading */}
           {loading ? (
             <div className="flex min-h-[320px] items-center justify-center">
               <div className="text-center">
@@ -355,13 +296,10 @@ export default function ClientsPage() {
           ) : filteredClients.length === 0 ? (
             <div className="flex min-h-[360px] items-center justify-center p-8">
               <div className="max-w-sm text-center">
-                <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl border border-white/[0.07] bg-white/[0.025]">
-                  <Users
-                    size={25}
-                    strokeWidth={1.5}
-                    className="text-white/25"
-                  />
-                </div>
+                <Users
+                  size={28}
+                  className="mx-auto text-white/20"
+                />
 
                 <h3 className="mt-5 text-sm font-medium text-white/70">
                   {search ? "No clients found" : "No clients yet"}
@@ -369,14 +307,15 @@ export default function ClientsPage() {
 
                 <p className="mt-2 text-xs leading-5 text-white/25">
                   {search
-                    ? "Try a different name, email or company."
-                    : "Add your first client to start building your client directory."}
+                    ? "Try another name, email, phone number or company."
+                    : "Clients created from bookings, enquiries or manually will appear here."}
                 </p>
 
                 {!search && (
                   <button
+                    type="button"
                     onClick={openModal}
-                    className="mt-6 inline-flex items-center gap-2 rounded-xl bg-[#c5a34a] px-5 py-2.5 text-xs font-semibold text-black transition hover:bg-[#d4b45c]"
+                    className="mt-6 inline-flex items-center gap-2 rounded-xl bg-[#c5a34a] px-5 py-2.5 text-xs font-semibold text-black"
                   >
                     <Plus size={15} />
                     Add First Client
@@ -386,30 +325,15 @@ export default function ClientsPage() {
             </div>
           ) : (
             <>
-              {/* Desktop table */}
               <div className="hidden overflow-x-auto lg:block">
                 <table className="w-full text-left">
                   <thead className="border-b border-white/[0.06] bg-white/[0.015]">
                     <tr>
-                      <th className="px-6 py-4 text-[10px] font-medium uppercase tracking-[0.16em] text-white/25">
-                        Client
-                      </th>
-
-                      <th className="px-6 py-4 text-[10px] font-medium uppercase tracking-[0.16em] text-white/25">
-                        Company
-                      </th>
-
-                      <th className="px-6 py-4 text-[10px] font-medium uppercase tracking-[0.16em] text-white/25">
-                        Contact
-                      </th>
-
-                      <th className="px-6 py-4 text-[10px] font-medium uppercase tracking-[0.16em] text-white/25">
-                        Location
-                      </th>
-
-                      <th className="px-6 py-4 text-[10px] font-medium uppercase tracking-[0.16em] text-white/25">
-                        Status
-                      </th>
+                      <TableHeading>Client</TableHeading>
+                      <TableHeading>Company</TableHeading>
+                      <TableHeading>Contact</TableHeading>
+                      <TableHeading>Location</TableHeading>
+                      <TableHeading>Created</TableHeading>
                     </tr>
                   </thead>
 
@@ -422,16 +346,16 @@ export default function ClientsPage() {
                         <td className="px-6 py-5">
                           <div className="flex items-center gap-3">
                             <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-[#c5a34a]/15 bg-[#c5a34a]/[0.06] text-xs font-semibold text-[#d4b45c]">
-                              {getInitials(client.user.name)}
+                              {getInitials(client.name)}
                             </div>
 
                             <div>
                               <p className="text-sm font-medium text-white/80">
-                                {client.user.name || "Unnamed Client"}
+                                {client.name}
                               </p>
 
                               <p className="mt-1 text-xs text-white/25">
-                                {client.user.email}
+                                {client.email}
                               </p>
                             </div>
                           </div>
@@ -447,13 +371,13 @@ export default function ClientsPage() {
                           <div className="space-y-1">
                             <p className="flex items-center gap-2 text-xs text-white/40">
                               <Mail size={13} />
-                              {client.user.email}
+                              {client.email}
                             </p>
 
-                            {client.user.phone && (
+                            {client.phone && (
                               <p className="flex items-center gap-2 text-xs text-white/25">
                                 <Phone size={13} />
-                                {client.user.phone}
+                                {client.phone}
                               </p>
                             )}
                           </div>
@@ -471,8 +395,8 @@ export default function ClientsPage() {
                           </p>
                         </td>
 
-                        <td className="px-6 py-5">
-                          <StatusBadge active={client.user.isActive} />
+                        <td className="px-6 py-5 text-xs text-white/25">
+                          {formatDate(client.createdAt)}
                         </td>
                       </tr>
                     ))}
@@ -480,7 +404,6 @@ export default function ClientsPage() {
                 </table>
               </div>
 
-              {/* Mobile/tablet cards */}
               <div className="grid gap-3 p-4 lg:hidden">
                 {filteredClients.map((client) => (
                   <div
@@ -489,23 +412,17 @@ export default function ClientsPage() {
                   >
                     <div className="flex items-start gap-3">
                       <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[#c5a34a]/15 bg-[#c5a34a]/[0.06] text-xs font-semibold text-[#d4b45c]">
-                        {getInitials(client.user.name)}
+                        {getInitials(client.name)}
                       </div>
 
                       <div className="min-w-0 flex-1">
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="min-w-0">
-                            <p className="truncate text-sm font-medium text-white/80">
-                              {client.user.name || "Unnamed Client"}
-                            </p>
+                        <p className="truncate text-sm font-medium text-white/80">
+                          {client.name}
+                        </p>
 
-                            <p className="mt-1 truncate text-xs text-white/25">
-                              {client.user.email}
-                            </p>
-                          </div>
-
-                          <StatusBadge active={client.user.isActive} />
-                        </div>
+                        <p className="mt-1 truncate text-xs text-white/25">
+                          {client.email}
+                        </p>
 
                         <div className="mt-4 space-y-2">
                           {client.companyName && (
@@ -515,10 +432,10 @@ export default function ClientsPage() {
                             </p>
                           )}
 
-                          {client.user.phone && (
+                          {client.phone && (
                             <p className="flex items-center gap-2 text-xs text-white/30">
                               <Phone size={13} />
-                              {client.user.phone}
+                              {client.phone}
                             </p>
                           )}
 
@@ -546,32 +463,30 @@ export default function ClientsPage() {
         </section>
       </div>
 
-      {/* Add Client Modal */}
       {modalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/75 p-4 backdrop-blur-md">
           <div className="my-8 w-full max-w-2xl overflow-hidden rounded-2xl border border-white/[0.08] bg-[#0b0b0b] shadow-2xl">
-            {/* Modal header */}
             <div className="flex items-center justify-between border-b border-white/[0.07] px-6 py-5">
               <div>
                 <p className="text-xs uppercase tracking-[0.18em] text-[#c5a34a]/70">
                   Client Management
                 </p>
 
-                <h2 className="mt-1 text-lg font-semibold text-white">
+                <h2 className="mt-1 text-lg font-semibold">
                   Add New Client
                 </h2>
               </div>
 
               <button
+                type="button"
                 onClick={closeModal}
                 disabled={saving}
-                className="rounded-xl p-2 text-white/30 transition hover:bg-white/[0.05] hover:text-white disabled:cursor-not-allowed"
+                className="rounded-xl p-2 text-white/30 transition hover:bg-white/[0.05] hover:text-white"
               >
                 <X size={18} />
               </button>
             </div>
 
-            {/* Form */}
             <form onSubmit={createClient}>
               <div className="max-h-[70vh] overflow-y-auto p-6">
                 {error && (
@@ -614,7 +529,9 @@ export default function ClientsPage() {
                   <FormField
                     label="Company"
                     value={form.companyName}
-                    onChange={(value) => updateField("companyName", value)}
+                    onChange={(value) =>
+                      updateField("companyName", value)
+                    }
                     placeholder="Company name"
                   />
 
@@ -628,7 +545,9 @@ export default function ClientsPage() {
                   <FormField
                     label="Province"
                     value={form.province}
-                    onChange={(value) => updateField("province", value)}
+                    onChange={(value) =>
+                      updateField("province", value)
+                    }
                     placeholder="Gauteng"
                   />
 
@@ -636,38 +555,37 @@ export default function ClientsPage() {
                     <FormField
                       label="Address"
                       value={form.address}
-                      onChange={(value) => updateField("address", value)}
+                      onChange={(value) =>
+                        updateField("address", value)
+                      }
                       placeholder="Street address"
                     />
                   </div>
 
-                  <div className="sm:col-span-2">
-                    <label className="block">
-                      <span className="mb-2 block text-xs font-medium text-white/45">
-                        Notes
-                      </span>
+                  <label className="block sm:col-span-2">
+                    <span className="mb-2 block text-xs font-medium text-white/45">
+                      Notes
+                    </span>
 
-                      <textarea
-                        value={form.notes}
-                        onChange={(event) =>
-                          updateField("notes", event.target.value)
-                        }
-                        rows={4}
-                        placeholder="Additional information about this client..."
-                        className="w-full resize-none rounded-xl border border-white/[0.08] bg-white/[0.025] px-4 py-3 text-sm text-white outline-none placeholder:text-white/20 transition focus:border-[#c5a34a]/30 focus:bg-white/[0.035]"
-                      />
-                    </label>
-                  </div>
+                    <textarea
+                      value={form.notes}
+                      onChange={(event) =>
+                        updateField("notes", event.target.value)
+                      }
+                      rows={4}
+                      placeholder="Additional information about this client..."
+                      className="w-full resize-none rounded-xl border border-white/[0.08] bg-white/[0.025] px-4 py-3 text-sm text-white outline-none placeholder:text-white/20 focus:border-[#c5a34a]/30"
+                    />
+                  </label>
                 </div>
               </div>
 
-              {/* Footer */}
               <div className="flex flex-col-reverse gap-3 border-t border-white/[0.07] p-5 sm:flex-row sm:justify-end">
                 <button
                   type="button"
                   onClick={closeModal}
                   disabled={saving}
-                  className="rounded-xl border border-white/[0.08] px-5 py-3 text-sm font-medium text-white/50 transition hover:bg-white/[0.04] hover:text-white disabled:cursor-not-allowed"
+                  className="rounded-xl border border-white/[0.08] px-5 py-3 text-sm font-medium text-white/50 transition hover:bg-white/[0.04] hover:text-white"
                 >
                   Cancel
                 </button>
@@ -675,7 +593,7 @@ export default function ClientsPage() {
                 <button
                   type="submit"
                   disabled={saving}
-                  className="rounded-xl bg-[#c5a34a] px-6 py-3 text-sm font-semibold text-black transition hover:bg-[#d4b45c] disabled:cursor-not-allowed disabled:opacity-50"
+                  className="rounded-xl bg-[#c5a34a] px-6 py-3 text-sm font-semibold text-black transition hover:bg-[#d4b45c] disabled:opacity-50"
                 >
                   {saving ? "Creating..." : "Create Client"}
                 </button>
@@ -685,6 +603,46 @@ export default function ClientsPage() {
         </div>
       )}
     </main>
+  );
+}
+
+function StatCard({
+  icon,
+  title,
+  value,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  value: number;
+}) {
+  return (
+    <div className="rounded-2xl border border-white/[0.07] bg-[#0b0b0b]/90 p-5">
+      <div className="flex items-center gap-3">
+        <div className="rounded-xl border border-[#c5a34a]/10 bg-[#c5a34a]/[0.06] p-3 text-[#c5a34a]">
+          {icon}
+        </div>
+
+        <div>
+          <p className="text-xs uppercase tracking-[0.14em] text-white/30">
+            {title}
+          </p>
+
+          <p className="mt-1 text-2xl font-semibold">{value}</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function TableHeading({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <th className="px-6 py-4 text-[10px] font-medium uppercase tracking-[0.16em] text-white/25">
+      {children}
+    </th>
   );
 }
 
@@ -707,8 +665,9 @@ function FormField({
     <label className="block">
       <span className="mb-2 block text-xs font-medium text-white/45">
         {label}
-
-        {required && <span className="ml-1 text-[#c5a34a]">*</span>}
+        {required && (
+          <span className="ml-1 text-[#c5a34a]">*</span>
+        )}
       </span>
 
       <input
@@ -717,42 +676,36 @@ function FormField({
         value={value}
         onChange={(event) => onChange(event.target.value)}
         placeholder={placeholder}
-        className="w-full rounded-xl border border-white/[0.08] bg-white/[0.025] px-4 py-3 text-sm text-white outline-none placeholder:text-white/20 transition focus:border-[#c5a34a]/30 focus:bg-white/[0.035]"
+        className="w-full rounded-xl border border-white/[0.08] bg-white/[0.025] px-4 py-3 text-sm text-white outline-none placeholder:text-white/20 focus:border-[#c5a34a]/30"
       />
     </label>
   );
 }
 
-function StatusBadge({ active }: { active: boolean }) {
-  return (
-    <span
-      className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-medium ${
-        active
-          ? "border-green-500/15 bg-green-500/[0.06] text-green-400"
-          : "border-white/[0.08] bg-white/[0.03] text-white/30"
-      }`}
-    >
-      <span
-        className={`h-1.5 w-1.5 rounded-full ${
-          active ? "bg-green-400" : "bg-white/25"
-        }`}
-      />
-
-      {active ? "Active" : "Inactive"}
-    </span>
-  );
-}
-
-function getInitials(name: string | null) {
-  if (!name) {
-    return "MC";
-  }
-
+function getInitials(name: string) {
   const parts = name.trim().split(/\s+/);
+
+  if (parts.length === 0 || !parts[0]) {
+    return "CL";
+  }
 
   if (parts.length === 1) {
     return parts[0].slice(0, 2).toUpperCase();
   }
 
   return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase();
+}
+
+function formatDate(value: string) {
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return "Unknown";
+  }
+
+  return new Intl.DateTimeFormat("en-ZA", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  }).format(date);
 }
